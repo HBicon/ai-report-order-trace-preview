@@ -176,7 +176,7 @@ a { color: inherit; text-decoration: none; }
 
 .review-link-row { margin-top: 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: 13px; }
 .review-link-row a { color: var(--green); font-weight: 700; }
-.review-link-row span { display: inline-flex; align-items: center; gap: 0; }
+.review-link-row span { display: inline-flex; align-items: center; gap: 6px; }
 .review-link-row span::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #94a2ad; }
 
 .preview-band {
