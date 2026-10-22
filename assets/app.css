@@ -270,6 +270,7 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
 .branch-label { color: var(--teal-dark); font-size: 10px; font-weight: 800; }
 .branch-card > strong { color: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums; }
 .branch-strategy { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.branch-meta { overflow: hidden; color: var(--subtle); font-family: "SFMono-Regular", Consolas, monospace; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
 .branch-tags { min-height: 17px; display: flex; flex-wrap: wrap; gap: 4px; }
 .branch-tags i { padding: 2px 5px; border-radius: 3px; color: #596777; background: var(--surface-soft); font-size: 7px; font-style: normal; }
 .branch-card-foot { padding-top: 5px; display: flex; align-items: center; gap: 8px; border-top: 1px dashed #e5ebea; color: var(--subtle); font-size: 7px; }
@@ -281,7 +282,14 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
 .branch-chain-banner > div > span:last-child, .branch-quote-banner > div > span:last-child { color: var(--muted); font-size: 8px; }
 .branch-banner-note { max-width: 46%; color: var(--muted); font-size: 8px; line-height: 1.45; text-align: right; }
 .stage-scope { margin-top: 2px; padding: 1px 4px; border-radius: 3px; color: #4d7d77; background: #edf8f5; font-size: 6px; font-weight: 700; }
+.stage-scope.branch { color: #6a7276; background: #f0f3f4; }
 .trace-stage.shared { border-style: dashed; background: #fbfdfc; }
+.strategy-binding-list { margin-top: 7px; display: grid; gap: 4px; }
+.strategy-binding { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; color: var(--muted); font-size: 7px; }
+.strategy-binding strong { color: var(--ink); font-size: 8px; }
+.strategy-binding span { padding: 1px 5px; border-radius: 3px; color: var(--teal-dark); background: var(--teal-soft); font-family: "SFMono-Regular", Consolas, monospace; }
+.strategy-binding b { color: var(--ink-soft); font-size: 8px; }
+.strategy-binding i { color: var(--subtle); font-style: normal; }
 .amount-stack { display: grid; gap: 2px; color: var(--ink); font-size: 10px; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .amount-stack > span { display: flex; align-items: center; gap: 5px; }
 .amount-stack b { min-width: 12px; color: var(--teal-dark); font-size: 8px; }

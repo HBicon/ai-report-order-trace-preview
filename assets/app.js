@@ -37,13 +37,13 @@
   const queueOrder = ['dual', 'priority', 'unquoted', 'aftersales', 'incomplete', 'normal'];
   const stageJudgements = {
     order: ['订单事件只读，不覆盖原订单状态。', '触发方式与渠道配置用于解释订单为什么进入 AI 识别。', '订单时间与 trace_id 是全链路查询主键。'],
-    input: ['图片和店员选项必须冻结为输入快照。', '追溯不会在查询时重新提交图片或重跑模型。', '图片质量与模型参数分开记录，避免混淆责任域。'],
-    labels: ['原始分数与阈值必须同时保存，低于阈值的候选也不能丢。', '候选标签是 P1 阈值模拟的前置数据。', '结果标签不能替代原始标签证据。'],
-    mapping: ['先记录当前报告分支选取/排除了哪些订单级 AI 标签，再看标签映射。', '映射必须使用报价时版本，不能以当前配置反推历史。', '映射链路中有缺口时，仅当前分支结论降级为待确认线索。'],
-    report: ['每个报告实例是只读决策快照，不支持人工修改。', '订单可以有多份报告，报告“唯一”只约束单个报告实例内结论。', '报告项需要能追溯到共享源标签和当前分支映射规则。'],
-    eligibility: ['买家资格和买家报价分支分开记录。', '单个买家未报价不能代表整单未报价。', '排除原因需保留配置版本和命中条件。'],
+    input: ['图片和店员选项必须冻结为报告分支输入快照。', '追溯不会在查询时重新提交图片或重跑模型。', '不同报告可以使用不同任务、图片和模型输出，不能用一份输入覆盖所有分支。'],
+    labels: ['原始分数与阈值必须同时保存，低于阈值的候选也不能丢。', '候选标签按报告分支的 run_id 独立保存，不能合并成订单级标签。', '结果标签不能替代原始标签证据。'],
+    mapping: ['先记录当前报告分支选取/排除了哪些本分支 AI 标签，再看标签映射。', '映射必须使用报价时版本，不能以当前配置反推历史。', '映射链路中有缺口时，仅当前分支结论降级为待确认线索。'],
+    report: ['每个报告实例是只读决策快照，不支持人工修改。', '订单可以有多份报告，报告“唯一”只约束单个报告实例内结论。', '报告项需要能追溯到本分支原始标签和当前分支映射规则。'],
+    eligibility: ['买家独立策略在报告生成前决定报告买家组。', '报告生成后不再做买家再匹配；同一策略可绑定多个买家。', '归属关系需保留买家、策略 ID/版本和报告实例的稳定关联。'],
     quote: ['每份报告、每位买家、每次报价只保留一个报价结果：实际报价。', '“成色 + 特定扣减项”命中后按其他成色价出价属于合法业务。', '系统不跨报告分支、跨成色档或基于外部基准生成高低结论，只核对当前分支规则链。'],
-    downstream: ['P0 按成交报告实例关联复检、售后状态和差异摘要。', '成交分支未确认时保留“待确认”，不默认最新报告或最高报价。', '售后差异不反向改写成交前的报告与报价快照。']
+    downstream: ['P0 按成交报告实例关联复检、售后状态和差异摘要。', '成交买家确定后按“成交买家 → 独立策略 → 报告实例”自动归属。', '售后差异不反向改写成交前的报告与报价快照。']
   };
 
   let queueBound = false;
@@ -94,6 +94,22 @@
     return Object.assign({}, scenario.sharedStages || {}, branch.stages || {});
   }
 
+  function branchData(scenario, branch, key) {
+    return branch && branch[key] !== undefined ? branch[key] : scenario[key];
+  }
+
+  function branchImages(scenario, branch) {
+    return branchData(scenario, branch, 'images') || [];
+  }
+
+  function branchCandidates(scenario, branch) {
+    return branchData(scenario, branch, 'candidates') || [];
+  }
+
+  function branchModel(scenario, branch) {
+    return branchData(scenario, branch, 'model') || {};
+  }
+
   function isSharedStage(scenario, key) {
     return Boolean(scenario.sharedStages && scenario.sharedStages[key]);
   }
@@ -102,7 +118,8 @@
     return branchesOf(scenario).map((branch) => [
       branch.label, branch.instanceId, branch.reportGrade, (branch.issues || []).join(' '),
       branch.strategy && branch.strategy.name, branch.strategy && branch.strategy.id,
-      branch.buyer, branch.amount
+      branch.buyer, branch.amount, branch.audience && (branch.audience.buyers || []).join(' '),
+      branch.model && branch.model.run, branch.model && branch.model.code
     ].join(' ')).join(' ');
   }
 
@@ -260,13 +277,13 @@
       tab.classList.toggle('active', active);
       tab.setAttribute('aria-selected', String(active));
       tab.setAttribute('tabindex', active ? '0' : '-1');
-      if (tabId === 'chain') tab.innerHTML = `全链路<span class="tab-count">8</span>`;
+      if (tabId === 'chain') tab.innerHTML = `全链路<span class="tab-count">${(scenario.stageOrder || stageOrder).length}</span>`;
       if (tabId === 'compare') {
         tab.hidden = branches.length < 2;
         tab.innerHTML = `分支对比<span class="tab-count">${branches.length}</span>`;
       }
       if (tabId === 'quote') tab.innerHTML = `分支报价<span class="tab-count">${branch.quote.rules.length}</span>`;
-      if (tabId === 'evidence') tab.innerHTML = `AI 证据<span class="tab-count">${scenario.images.length}</span>`;
+      if (tabId === 'evidence') tab.innerHTML = `AI 证据<span class="tab-count">${branchImages(scenario, branch).length}</span>`;
       if (tabId === 'downstream') tab.innerHTML = `成交与售后<span class="tab-count">${branch.downstream.events.length || '—'}</span>`;
     });
     if (state.activeTab === 'compare' && branches.length < 2) state.activeTab = 'chain';
@@ -277,18 +294,24 @@
     if (branches.length < 2) {
       return `<section class="branch-overview single"><div class="branch-overview-head"><div><span class="branch-kicker">${ic('fileText')}报告锚点</span><h2>本订单生成 1 份 AI 报告</h2><p>当前版本仍按单一报告展示；多报告订单请查看“一单双报告”案例。</p></div><span class="status-pill neutral no-dot">${esc(branches[0].instanceId || '单一报告')}</span></div></section>`;
     }
-    const cards = branches.map((branch) => `
+    const cards = branches.map((branch) => {
+      const model = branchModel(scenario, branch);
+      const buyers = branch.audience && branch.audience.buyers ? branch.audience.buyers.join(' / ') : branch.buyer;
+      return `
       <button class="branch-card${branch.id === activeBranch.id ? ' active' : ''}" type="button" data-branch="${esc(branch.id)}" aria-pressed="${branch.id === activeBranch.id}">
         <span class="branch-card-top"><span class="branch-label">${esc(branch.label)}</span><span class="status-pill ${esc(branch.badgeTone)} no-dot">${esc(branch.badge)}</span></span>
         <strong>${esc(branch.reportGrade)} · ${esc(branch.amount || '未报价')}</strong>
-        <span class="branch-strategy">${esc(branch.strategy.id)} · ${esc(branch.strategy.name)} ${esc(branch.strategy.version)}</span>
+        <span class="branch-strategy">${esc(buyers)} → ${esc(branch.strategy.id)} · ${esc(branch.strategy.name)} ${esc(branch.strategy.version)}</span>
+        <span class="branch-meta">${esc(model.run || '任务待补')} · ${branchImages(scenario, branch).length} 图 · ${branchCandidates(scenario, branch).length} 个候选</span>
         <span class="branch-tags">${(branch.issues || []).map((issue) => `<i>${esc(issue)}</i>`).join('')}</span>
         <span class="branch-card-foot"><span>${esc(branch.buyer)}</span><span>${esc(branch.instanceId)}</span>${ic('chevronRight')}</span>
-      </button>`).join('');
+      </button>`;
+    }).join('');
     const relation = scenario.branchRelation;
-    const origin = relation ? `<div class="branch-origin"><div class="branch-origin-copy">${ic('gitBranch')}<div><strong>为什么会有 ${branches.length} 份报告</strong><p>${esc(relation.reason)}：${relation.strategies.map((item) => `<span>${esc(item)}</span>`).join(' / ')}。每个策略独立选择标签、生成报告并匹配买家。</p></div></div><span class="status-pill warning no-dot">${esc(relation.label)}</span></div><p class="branch-origin-note">${esc(relation.note)}</p>` : '';
+    const bindings = relation && relation.bindings ? relation.bindings.map((item) => `<div class="strategy-binding"><strong>${esc(item.buyer)}</strong><i>→</i><span>${esc(item.strategy)}</span><i>→</i><b>${esc(item.report)}</b></div>`).join('') : '';
+    const origin = relation ? `<div class="branch-origin"><div class="branch-origin-copy">${ic('gitBranch')}<div><strong>为什么会有 ${branches.length} 份报告</strong><p>${esc(relation.reason)}：${relation.strategies.map((item) => `<span>${esc(item)}</span>`).join(' / ')}。买家独立策略先决定报告买家组，再由各分支独立执行 AI 任务、标签选择、报告和报价。</p><div class="strategy-binding-list">${bindings}</div></div></div><span class="status-pill info no-dot">${esc(relation.label)}</span></div><p class="branch-origin-note">${esc(relation.note)}</p>` : '';
     return `<section class="branch-overview">
-      <div class="branch-overview-head"><div><span class="branch-kicker">${ic('gitBranch')}报告分支</span><h2>本订单生成 ${branches.length} 份不同的 AI 报告</h2><p>先选择报告分支，再查看该分支自己的策略、标签选择、报告、买家匹配与报价。分支结果不合并。</p></div><span class="status-pill warning no-dot">多报告订单</span></div>
+      <div class="branch-overview-head"><div><span class="branch-kicker">${ic('gitBranch')}报告分支</span><h2>本订单生成 ${branches.length} 份不同的 AI 报告</h2><p>买家先按独立策略归组，报告生成前即确定受众；报告 A/B 并行保留，后生成报告不覆盖先生成报告，报价结果不合并。</p></div><span class="status-pill warning no-dot">多报告订单</span></div>
       ${origin}
       <div class="branch-card-grid">${cards}</div>
     </section>`;
@@ -315,13 +338,15 @@
 
   function renderChain(scenario, branch) {
     const stagesByKey = branchStages(scenario, branch);
-    const stages = stageOrder.map((key, index) => {
+    const chainOrder = scenario.stageOrder && scenario.stageOrder.length ? scenario.stageOrder : stageOrder;
+    const stageKeys = chainOrder.filter((key) => stagesByKey[key]);
+    const stages = stageKeys.map((key, index) => {
       const item = stagesByKey[key];
-      const arrow = index < stageOrder.length - 1 ? `<span class="stage-arrow">${ic('chevronRight')}</span>` : '';
+      const arrow = index < stageKeys.length - 1 ? `<span class="stage-arrow">${ic('chevronRight')}</span>` : '';
       const shared = isSharedStage(scenario, key);
       return `<button class="trace-stage ${esc(item.status)}${key === 'report' ? ' anchor' : ''}${shared ? ' shared' : ''}${key === state.activeStage ? ' active' : ''}" type="button" data-stage="${esc(key)}" aria-pressed="${key === state.activeStage}">
         <span class="stage-icon">${icon(item.icon)}</span>
-        <strong>${esc(item.title)}</strong>${shared ? '<span class="stage-scope">订单级</span>' : ''}
+        <strong>${esc(item.title)}</strong><span class="stage-scope${shared ? '' : ' branch'}">${shared ? '订单级' : '报告分支'}</span>
         <small>${esc(item.time || '—')}</small>
         <span class="stage-state">${esc(stageLabels[item.status] || item.status)}</span>
       </button>${arrow}`;
@@ -333,12 +358,14 @@
     const noteClass = stage.status === 'warn' || stage.status === 'error' ? ' warning' : '';
     const config = renderConfig(branch.config);
     const events = branch.events.map(([time, title, description, status]) => `<div class="event-row"><span class="event-time">${esc(time)}</span><span class="event-line"><i class="event-dot ${esc(status)}"></i></span><span class="event-copy"><strong>${esc(title)}</strong><small>${esc(description)}</small></span><span class="event-state">${esc(stageLabels[status] || status || '')}</span></div>`).join('');
-    const sharedCount = Object.keys(scenario.sharedStages || {}).length;
-    const sharedNote = scenario.branchRelation && scenario.branchRelation.sharedEvidence
-      ? '当前演示假设共用模型任务；若实际分支重跑，输入与标签节点应改为分支证据。'
-      : '前 3 个节点为订单级证据，后续节点只属于当前报告分支。';
-    return `<div class="branch-chain-banner"><div><span class="branch-kicker">${ic('gitBranch')}当前报告分支</span><strong>${esc(branch.label)} · ${esc(branch.instanceId)}</strong><span>${esc(branch.strategy.id)} · ${esc(branch.strategy.name)} ${esc(branch.strategy.version)}</span></div><span class="status-pill ${esc(branch.badgeTone)} no-dot">${esc(branch.badge)}</span></div>
-      <div class="section-title-row"><div><h2>订单级证据 → ${esc(branch.label)}独立链路</h2><p>${esc(sharedNote)}切换分支查看另一份报告。</p></div><span class="section-meta">8 个节点 · ${sharedCount ? sharedCount + ' 个订单级 · ' : ''}只读快照</span></div>
+    const sharedCount = stageKeys.filter((key) => isSharedStage(scenario, key)).length;
+    const buyers = branch.audience && branch.audience.buyers ? branch.audience.buyers.join(' / ') : branch.buyer;
+    const model = branchModel(scenario, branch);
+    const scopeNote = branchesOf(scenario).length > 1
+      ? '订单节点只保留公共事实；买家策略归属、AI 输入、独立任务、候选标签、映射、报告和报价均属于当前报告分支。'
+      : '前段记录订单级 AI 证据，后续节点属于当前报告实例。';
+    return `<div class="branch-chain-banner"><div><span class="branch-kicker">${ic('gitBranch')}当前报告分支</span><strong>${esc(branch.label)} · ${esc(branch.instanceId)}</strong><span>${esc(buyers)} → ${esc(branch.strategy.id)} · ${esc(branch.strategy.name)} ${esc(branch.strategy.version)} · ${esc(model.run || '任务待补')}</span></div><span class="status-pill ${esc(branch.badgeTone)} no-dot">${esc(branch.badge)}</span></div>
+      <div class="section-title-row"><div><h2>订单公共事实 → ${esc(branch.label)}独立链路</h2><p>${esc(scopeNote)}切换分支查看另一份报告。</p></div><span class="section-meta">${stageKeys.length} 个节点 · ${sharedCount} 个订单级 · 只读快照</span></div>
       <div class="trace-rail-wrap">
         <div class="trace-rail" role="group" aria-label="${esc(branch.label)}追溯链路">${stages}</div>
         <div class="trace-legend"><span><i></i>正常</span><span><i class="warn"></i>需关注</span><span><i class="error"></i>异常</span><span><i class="muted"></i>未发生</span><span>订单级节点 / 报告分支节点</span></div>
@@ -346,7 +373,7 @@
       <div class="trace-detail-grid">
         <section class="panel stage-panel">
           <div class="stage-panel-head">
-            <div class="stage-panel-title ${esc(stage.status)}"><span class="stage-icon">${icon(stage.icon)}</span><div><h3>${esc(stage.title)}</h3><p>${esc(stage.time || '—')} · ${esc(stageLabels[stage.status] || stage.status)}${isSharedStage(scenario, state.activeStage) ? ' · 订单级证据' : ' · ' + esc(branch.instanceId)}</p></div></div>
+            <div class="stage-panel-title ${esc(stage.status)}"><span class="stage-icon">${icon(stage.icon)}</span><div><h3>${esc(stage.title)}</h3><p>${esc(stage.time || '—')} · ${esc(stageLabels[stage.status] || stage.status)}${isSharedStage(scenario, state.activeStage) ? ' · 订单级公共事实' : ' · 报告分支 · ' + esc(branch.instanceId)}</p></div></div>
             <span class="status-pill ${stage.status === 'ok' ? 'success' : stage.status === 'error' ? 'danger' : stage.status === 'muted' ? 'neutral' : 'warning'}">${esc(stageLabels[stage.status] || stage.status)}</span>
           </div>
           <p>${esc(stage.summary)}</p>
@@ -369,29 +396,41 @@
   function renderComparison(scenario) {
     const branches = branchesOf(scenario);
     const relation = scenario.branchRelation;
+    const summaryValue = (branch, labels, fallback) => {
+      const item = branch.downstream.summary.find((entry) => labels.includes(entry.label));
+      return item ? item.value : fallback;
+    };
     const rows = [
       ['分支来源 / 关系', () => relation ? `${relation.label} · ${relation.strategies.join(' / ')}` : '单一报告'],
-      ['运营策略', (branch) => `${branch.strategy.id} · ${branch.strategy.name} ${branch.strategy.version}`],
+      ['买家策略归属（报告生成前）', (branch) => `${branch.audience && branch.audience.buyers ? branch.audience.buyers.join(' / ') : branch.buyer} → ${branch.strategy.id} ${branch.strategy.version}`],
+      ['独立模型任务', (branch) => {
+        const model = branchModel(scenario, branch);
+        return `${model.run || '待补'} · ${model.code || '—'} ${model.version || ''}`.trim();
+      }],
+      ['分支输入 / 候选标签', (branch) => {
+        const model = branchModel(scenario, branch);
+        return `${branchImages(scenario, branch).length} 图 · ${branchCandidates(scenario, branch).length} 个候选 · 阈值 ${model.threshold || '—'}`;
+      }],
       ['策略选用标签', (branch) => (branch.selectedLabels || []).join(' · ') || branch.strategy.selected || '—'],
       ['报告实例 / 成色', (branch) => `${branch.instanceId} · ${branch.reportGrade}`],
       ['报告问题项', (branch) => (branch.issues || []).join(' · ') || '报告项待核'],
-      ['买家匹配', (branch) => branch.buyer || '未匹配'],
       ['规则链结论', (branch) => branch.quote.statusLabel],
       ['分支实际报价', (branch) => branch.amount || '未报价'],
-      ['成交 / 售后', (branch) => {
-        const deal = branch.downstream.summary.find((item) => item.label === '成交分支');
-        const afterSale = branch.downstream.summary.find((item) => item.label === '售后');
-        return `${deal ? deal.value : '未找到'} / ${afterSale ? afterSale.value : '未找到'}`;
-      }]
+      ['成交买家 / 报告归属', (branch) => `${summaryValue(branch, ['成交买家', '成交'], '未找到')} / ${summaryValue(branch, ['报告归属', '成交报告'], '待确认')}`],
+      ['售后', (branch) => branch.downstream.afterSale ? branch.downstream.afterSale.status : branch.downstream.pendingDeal ? '待成交后关联' : '未找到']
     ];
-    const shareTitle = relation ? '演示假设：两份报告引用同一份订单级证据' : '两份报告共用同一份订单级证据';
-    const shareNote = relation ? relation.note : `模型任务 ${scenario.model.run}、${scenario.model.code}、${scenario.images.length} 张图片、${scenario.candidates.length} 个候选标签和阈值 ${scenario.model.threshold} 均只记录一次。`;
+    const evidenceLine = branches.map((branch) => {
+      const model = branchModel(scenario, branch);
+      return `${branch.label}：${model.run || '任务待补'} · ${branchImages(scenario, branch).length} 图 · ${branchCandidates(scenario, branch).length} 个候选`;
+    }).join('；');
+    const shareTitle = relation ? '每个报告分支独立保存 AI 输入、模型任务和候选标签' : '单份报告使用独立 AI 任务与候选证据';
+    const shareNote = `${evidenceLine}。独立任务或输入导致的差异属于模型证据差异；从同一分支候选标签中选取不同标签属于策略选择差异，两类责任域分开判断。`;
     const head = branches.map((branch) => `<th><div class="compare-head"><strong>${esc(branch.label)}</strong><span>${esc(branch.instanceId)}</span><button class="panel-link" type="button" data-branch-jump="${esc(branch.id)}">查看分支${ic('chevronRight')}</button></div></th>`).join('');
     const body = rows.map(([label, value]) => `<tr><th scope="row">${esc(label)}</th>${branches.map((branch) => `<td>${esc(value(branch))}</td>`).join('')}</tr>`).join('');
-    return `<section class="branch-share-card"><div>${ic('database')}<span><strong>${esc(shareTitle)}</strong><p>${esc(shareNote)}</p></span></div><span class="status-pill ${relation ? 'warning' : 'info'} no-dot">${relation ? '共用关系待研发确认' : '共享输入不复制'}</span></section>
-      <div class="section-title-row"><div><h2>报告 A / B 分支对比</h2><p>对比策略选择、映射结果、买家匹配和分支报价；分支金额不合并、不平均，也不跨成色档比较高低。</p></div><span class="section-meta">${branches.length} 个报告实例</span></div>
+    return `<section class="branch-share-card"><div>${ic('database')}<span><strong>${esc(shareTitle)}</strong><p>${esc(shareNote)}</p></span></div><span class="status-pill info no-dot">${relation ? '并行保留 · 不覆盖' : '独立证据'}</span></section>
+      <div class="section-title-row"><div><h2>${esc(branches.map((branch) => branch.label).join(' / '))} 分支对比</h2><p>对比买家策略归属、独立模型任务、标签选择、报告和分支报价；金额不合并、不平均，也不跨成色档比较高低。</p></div><span class="section-meta">${branches.length} 个报告实例</span></div>
       <div class="table-wrap branch-compare-table"><table class="data-table"><thead><tr><th>比较维度</th>${head}</tr></thead><tbody>${body}</tbody></table></div>
-      <div class="branch-compare-notes"><div>${ic('info')}<span><strong>为什么必须分分支：</strong>当两个策略共用同一批原始标签时，可以选择不同标签，生成不同成色与不同扣减项，并匹配不同买家。把两份报告合成一张，会掩盖分支 B 的规则链差异。</span></div><div>${ic('alertCircle')}<span><strong>待业务确认：</strong>两份报告同时进入匹配时，最终成交采用哪个报告实例、按买家还是策略优先级选择，尚未在现有规则中确认；原型不自行编造成交分支。</span></div></div>`;
+      <div class="branch-compare-notes"><div>${ic('info')}<span><strong>为什么必须分分支：</strong>每个买家先使用独立策略归属报告；各报告又可以拥有不同模型任务、输入、候选标签和阈值。把证据合成一张，会混淆模型输出差异、策略选择差异和单分支规则差异。</span></div><div>${ic('alertCircle')}<span><strong>成交归属规则：</strong>成交买家同步后，系统按“成交买家 → 其独立策略 → 对应报告实例”自动确定归属，再关联该报告下的报价尝试和售后。</span></div></div>`;
   }
 
   function renderConfig(config) {
@@ -401,15 +440,17 @@
   function renderQuote(scenario, branch) {
     const quote = branch.quote;
     const multiReport = branchesOf(scenario).length > 1;
+    const buyers = branch.audience && branch.audience.buyers ? branch.audience.buyers.join(' / ') : branch.buyer;
+    const model = branchModel(scenario, branch);
     const amount = quote.amountRaw == null ? '—' : quote.amount;
     const priceNote = quote.amountRaw == null ? '本分支未生成报价' : `${branch.label} · 分支唯一报价`;
     const rules = quote.rules.map((rule) => `<tr class="${rule.tone === 'danger' ? 'missed' : rule.hit && rule.tone === 'success' ? 'hit' : ''}"><td><span class="priority">${rule.priority}</span></td><td><span class="rule-id">${esc(rule.id)}</span><span class="rule-name">${esc(rule.name)}</span></td><td>${esc(rule.condition)}</td><td>${esc(rule.action)}</td><td><span class="status-pill ${esc(rule.tone)} no-dot">${esc(rule.result)}</span></td></tr>`).join('');
     const calc = quote.lines.length ? `${quote.lines.map((line) => `<div class="calc-line ${esc(line.kind)}"><span class="calc-label">${esc(line.label)}</span><span class="calc-amount">${line.amount < 0 ? '−' : ''}¥${Math.abs(line.amount).toLocaleString('zh-CN')}</span><span class="calc-source">${esc(line.source)}</span></div>`).join('')}<div class="calc-total"><span>本分支实际报价</span><div><strong>¥${esc(quote.total)}</strong><small>${esc(quote.totalNote)}</small></div></div>` : `<div class="empty-price">${ic('circleX')}<strong>未生成报价</strong><span>报价在扣减项匹配阶段终止，系统不生成推测金额或第二个价格。</span></div>`;
     const difference = quote.difference;
-    return `<div class="branch-quote-banner"><div><span class="branch-kicker">${ic('gitBranch')}当前报告分支</span><strong>${esc(branch.label)} · ${esc(branch.instanceId)}</strong><span>${esc(branch.strategy.id)} · ${esc(branch.strategy.name)} ${esc(branch.strategy.version)}</span></div>${multiReport ? `<span class="branch-banner-note">仅展示当前分支报价，其他报告请切换分支或查看分支对比</span>` : ''}</div>
+    return `<div class="branch-quote-banner"><div><span class="branch-kicker">${ic('gitBranch')}当前报告分支</span><strong>${esc(branch.label)} · ${esc(branch.instanceId)}</strong><span>${esc(buyers)} → ${esc(branch.strategy.id)} · ${esc(branch.strategy.name)} ${esc(branch.strategy.version)} · ${esc(model.run || '任务待补')}</span></div>${multiReport ? `<span class="branch-banner-note">仅展示当前分支报价，其他报告请切换分支或查看分支对比</span>` : ''}</div>
       <section class="single-price-card">
         <div><div class="single-price-label">${ic('receipt')}<span>${esc(priceNote)}</span></div><div class="single-price-value"><strong>${esc(amount)}</strong><span>${quote.amountRaw == null ? '未形成报价结果' : '买家实际报价 · 本次唯一报价对象'}</span></div><div class="single-price-sub">本页不展示应得报价、成本价、市场价、可比基准价或规则重算价，也不与其他报告分支的金额合并比较。</div></div>
-        <div class="single-price-meta"><div><span>报价尝试</span><strong>${esc(quote.attempt)}</strong></div><div><span>买家分支</span><strong>${esc(quote.buyer)}</strong></div><div><span>报告实例</span><strong>${esc(branch.instanceId)}</strong></div><div><span>规则链结论</span><span class="status-pill ${esc(quote.statusTone)} no-dot">${esc(quote.statusLabel)}</span></div></div>
+        <div class="single-price-meta"><div><span>报价尝试</span><strong>${esc(quote.attempt)}</strong></div><div><span>买家策略归属</span><strong>${esc(buyers)} → ${esc(branch.strategy.id)}</strong></div><div><span>报告实例</span><strong>${esc(branch.instanceId)}</strong></div><div><span>规则链结论</span><span class="status-pill ${esc(quote.statusTone)} no-dot">${esc(quote.statusLabel)}</span></div></div>
       </section>
       <div class="quote-grid">
         <section class="panel">
@@ -430,35 +471,41 @@
   }
 
   function renderEvidence(scenario, branch) {
-    const imageCards = scenario.images.map((image) => {
+    const images = branchImages(scenario, branch);
+    const candidates = branchCandidates(scenario, branch);
+    const model = branchModel(scenario, branch);
+    const multiReport = branchesOf(scenario).length > 1;
+    const audience = branch.audience && branch.audience.buyers ? branch.audience.buyers.join(' / ') : branch.buyer;
+    const imageCards = images.map((image) => {
       const numeric = Number.parseFloat(image.confidence);
       const width = Number.isFinite(numeric) ? Math.max(3, Math.min(100, numeric * 100)) : 0;
       return `<article class="evidence-card"><div class="evidence-visual">${phoneIllustration(image)}<span class="evidence-badge">${esc(image.meta)}</span><button class="evidence-expand" type="button" data-image="${esc(image.id)}" aria-label="查看${esc(image.title)}大图">${ic('eye')}</button></div><div class="evidence-card-copy"><header><strong>${esc(image.title)}</strong><span class="status-pill ${numeric >= 0.65 ? 'success' : 'neutral'} no-dot">${esc(image.confidence)}</span></header><p>${esc(image.subtitle)}</p><footer><span>${esc(image.marker)}</span><span class="confidence"><span class="confidence-bar"><span style="width:${width}%"></span></span>${esc(image.confidence)}</span></footer></div></article>`;
     }).join('');
-    const candidateRows = scenario.candidates.length ? scenario.candidates.map((item) => {
+    const candidateRows = candidates.length ? candidates.map((item) => {
       const numeric = Number.parseFloat(item.confidence);
       const width = Number.isFinite(numeric) ? Math.max(3, Math.min(100, numeric * 100)) : 0;
       const selected = branch.selectedLabels ? branch.selectedLabels.includes(item.label) : item.accepted;
       const decision = !item.accepted ? item.reason : selected ? '本分支采用' : '本分支策略未选取';
       return `<tr class="${selected ? '' : 'filtered'}"><td class="label-name">${esc(item.label)}</td><td>${esc(item.type)}</td><td><span class="confidence-cell"><span class="confidence-bar"><span style="width:${width}%"></span></span><b>${esc(item.confidence.toFixed(2))}</b></span></td><td><span class="threshold-pill">≥ ${esc(item.threshold.toFixed(2))}</span></td><td><span class="accept-state${selected ? '' : ' filtered'}">${ic(selected ? 'circleCheck' : 'minus')}${esc(decision)}</span></td></tr>`;
     }).join('') : '';
-    const candidateTable = scenario.candidates.length
+    const candidateTable = candidates.length
       ? `<div class="table-wrap"><table class="data-table confidence-table"><thead><tr><th>候选标签</th><th>标签类型</th><th>原始置信度</th><th>采纳阈值</th><th>本分支决策</th></tr></thead><tbody>${candidateRows}</tbody></table></div>`
       : `<div class="missing-evidence">${ic('fileWarning')}<strong>原始标签与候选快照缺失</strong><p>当前只保留图片文件和最终报告，无法还原标签类型、原始置信度、阈值和过滤原因。此缺口会阻断对报告条件完整性的确认。</p></div>`;
-    const mappingList = branch.mappings.length ? branch.mappings.map((item) => `<div class="mapping-item${item.filtered ? ' filtered' : ''}"><div class="mapping-node"><span>订单级原始标签</span><strong>${esc(item.source)}</strong></div><span class="mapping-arrow">${ic('chevronRight')}</span><div class="mapping-node"><span>标签类型</span><strong>${esc(item.type)}</strong></div><span class="mapping-arrow">${ic('chevronRight')}</span><div class="mapping-node"><span>业务选项 / 严重度</span><strong>${esc(item.option)}<br>${esc(item.severity)}</strong></div><span class="mapping-arrow">${ic('chevronRight')}</span><div class="mapping-node report"><span>${esc(branch.label)}输出</span><strong>${esc(item.report)}</strong></div></div>`).join('') : `<div class="missing-evidence">${ic('gitBranch')}<strong>映射决策路径缺失</strong><p>无法连接源标签和报告项，不能用当前映射配置补造历史路径。</p></div>`;
+    const mappingList = branch.mappings.length ? branch.mappings.map((item) => `<div class="mapping-item${item.filtered ? ' filtered' : ''}"><div class="mapping-node"><span>${esc(branch.label)}原始标签</span><strong>${esc(item.source)}</strong></div><span class="mapping-arrow">${ic('chevronRight')}</span><div class="mapping-node"><span>标签类型</span><strong>${esc(item.type)}</strong></div><span class="mapping-arrow">${ic('chevronRight')}</span><div class="mapping-node"><span>业务选项 / 严重度</span><strong>${esc(item.option)}<br>${esc(item.severity)}</strong></div><span class="mapping-arrow">${ic('chevronRight')}</span><div class="mapping-node report"><span>${esc(branch.label)}输出</span><strong>${esc(item.report)}</strong></div></div>`).join('') : `<div class="missing-evidence">${ic('gitBranch')}<strong>映射决策路径缺失</strong><p>无法连接源标签和报告项，不能用当前映射配置补造历史路径。</p></div>`;
     return `<div class="branch-quote-banner"><div><span class="branch-kicker">${ic('gitBranch')}当前报告分支</span><strong>${esc(branch.label)} · ${esc(branch.instanceId)}</strong><span>${esc(branch.strategy.id)} · ${esc(branch.strategy.name)} ${esc(branch.strategy.version)}</span></div><span class="status-pill ${esc(branch.badgeTone)} no-dot">${esc(branch.badge)}</span></div>
-      <div class="evidence-intro"><div>${ic('image')}<span><strong>订单级输入 + ${esc(branch.label)}策略选择与映射</strong><p>本演示假设两个分支共用图片、模型任务和原始候选标签；若实际分支重跑，应分别显示各自的输入与任务。本页“本分支采用”只代表当前报告分支的运营策略选择。</p></span></div><span class="status-pill ${branch.completenessPct === 100 ? 'success' : 'warning'} no-dot">${esc(branch.completenessText)}</span></div>
+      <div class="evidence-intro"><div>${ic('image')}<span><strong>${esc(branch.label)}独立 AI 输入 + 策略选择与映射</strong><p>${multiReport ? '本页只展示当前报告分支的图片、模型任务、候选标签和阈值；其他报告分支可能使用不同任务与输出。' : '本页展示该报告实例对应的图片、模型任务、候选标签和阈值。'}“本分支采用”只代表买家策略从本分支候选标签中的选择。</p></span></div><span class="status-pill ${branch.completenessPct === 100 ? 'success' : 'warning'} no-dot">${esc(branch.completenessText)}</span></div>
       <div class="evidence-grid">${imageCards}</div>
       <div class="evidence-lower">
-        <section class="panel"><header class="panel-head"><div><h3>候选标签观测</h3><p>订单级共享候选；最后一列显示当前报告分支是否采用</p></div><span class="status-pill neutral no-dot">${scenario.candidates.length || 0} 条</span></header>${candidateTable}</section>
-        <aside class="panel model-panel"><h3>模型与阈值上下文</h3><dl class="model-list"><div><dt>模型 code</dt><dd>${esc(scenario.model.code)}</dd></div><div><dt>模型版本</dt><dd>${esc(scenario.model.version)}</dd></div><div><dt>任务 run_id（演示假设共用）</dt><dd>${esc(scenario.model.run)}</dd></div><div><dt>采纳阈值</dt><dd>${esc(scenario.model.threshold)}</dd></div><div><dt>输入摘要</dt><dd>${esc(scenario.model.input)}</dd></div><div><dt>图片质量</dt><dd>${esc(scenario.model.quality)}</dd></div></dl></aside>
+        <section class="panel"><header class="panel-head"><div><h3>候选标签观测</h3><p>${esc(branch.label)}独立候选；最后一列显示该分支买家策略是否采用</p></div><span class="status-pill neutral no-dot">${candidates.length || 0} 条</span></header>${candidateTable}</section>
+        <aside class="panel model-panel"><h3>模型与阈值上下文</h3><dl class="model-list"><div><dt>策略买家组</dt><dd>${esc(audience)}</dd></div><div><dt>买家策略</dt><dd>${esc(branch.strategy.id)} · ${esc(branch.strategy.version)}</dd></div><div><dt>模型 code</dt><dd>${esc(model.code || '—')}</dd></div><div><dt>模型版本</dt><dd>${esc(model.version || '—')}</dd></div><div><dt>任务 run_id</dt><dd>${esc(model.run || '—')}</dd></div><div><dt>采纳阈值</dt><dd>${esc(model.threshold || '—')}</dd></div><div><dt>输入摘要</dt><dd>${esc(model.input || '—')}</dd></div><div><dt>图片质量</dt><dd>${esc(model.quality || '—')}</dd></div></dl></aside>
       </div>
-      <section class="panel mapping-section"><header class="panel-head"><div><h3>${esc(branch.label)}：标签到报告的映射证据</h3><p>订单级原始标签 → 标签类型 → 业务选项/严重度 → 当前分支报告输出</p></div><span class="status-pill neutral no-dot">${esc(branch.strategy.id)} · MAP 快照</span></header><div class="panel-body"><div class="mapping-list">${mappingList}</div></div></section>
+      <section class="panel mapping-section"><header class="panel-head"><div><h3>${esc(branch.label)}：标签到报告的映射证据</h3><p>本分支原始标签 → 标签类型 → 业务选项/严重度 → 当前分支报告输出</p></div><span class="status-pill neutral no-dot">${esc(branch.strategy.id)} · MAP 快照</span></header><div class="panel-body"><div class="mapping-list">${mappingList}</div></div></section>
       <div class="stage-note">${ic('info')}<span>阈值调整在 P1 只做建议与只读模拟；分数校准在 P2 评估，模型重训不在本方案范围。任何阶段都不会由追溯系统自动修改模型或配置。</span></div>`;
   }
 
   function renderDownstream(scenario, branch) {
     const data = branch.downstream;
+    const buyers = branch.audience && branch.audience.buyers ? branch.audience.buyers.join(' / ') : branch.buyer;
     const summary = `<div class="downstream-summary">${data.summary.map((item) => `<div><span>${esc(item.label)}</span><strong>${esc(item.value)}</strong><small>${esc(item.note)}</small></div>`).join('')}</div>`;
     if (!data.events.length && !data.afterSale) {
       return `${summary}<div class="empty-downstream">${ic('packageCheck')}<strong>未找到成交与售后事件</strong><p>${esc(data.note)}</p></div><div class="p1-boundary">${ic('info')}<span>证据不完整时，P0 不推断“未成交”或“无售后”，只展示“未找到事件”。后续是否补证由运营或数据负责人处理。</span></div>`;
@@ -466,8 +513,10 @@
     const events = data.events.map(([time, title, description, status]) => `<div class="downstream-event"><span class="downstream-time">${esc(time)}</span><span class="downstream-line"><i class="downstream-dot ${esc(status)}"></i></span><div class="downstream-copy"><strong>${esc(title)}</strong><p>${esc(description)}</p></div></div>`).join('');
     const side = data.afterSale
       ? `<aside class="panel after-sale-card"><header><div><h3>售后案件 ${esc(data.afterSale.id)}</h3><p class="single-price-sub">${esc(data.afterSale.buyer)}</p></div><span class="status-pill warning no-dot">${esc(data.afterSale.status)}</span></header><p>${esc(data.afterSale.issue)}</p><div class="after-sale-facts"><div><span>金额影响</span><strong>${esc(data.afterSale.impact)}</strong></div><div><span>当前负责人</span><strong>${esc(data.afterSale.owner)}</strong></div><div><span>处理状态</span><strong>${esc(data.afterSale.status)}</strong></div></div></aside>`
+      : data.pendingDeal
+      ? `<aside class="panel after-sale-card"><header><div><h3>成交后报告归属</h3><p class="single-price-sub">由成交买家自动反查</p></div><span class="status-pill neutral no-dot">待成交</span></header><p>${esc(data.note)}</p><div class="after-sale-facts"><div><span>归属路径</span><strong>成交买家 → 独立策略 → 报告</strong></div><div><span>报告回写</span><strong>不改写原报告</strong></div><div><span>售后关联</span><strong>绑定归属报告</strong></div></div></aside>`
       : `<aside class="panel after-sale-card"><header><div><h3>售后状态</h3><p class="single-price-sub">成交后结果</p></div><span class="status-pill success no-dot">无售后</span></header><p>${esc(data.note)}</p><div class="after-sale-facts"><div><span>报告回写</span><strong>不改写原报告</strong></div><div><span>报价回写</span><strong>不重算原报价</strong></div><div><span>责任判定</span><strong>不在 P0 自动归因</strong></div></div></aside>`;
-    return `<div class="branch-quote-banner"><div><span class="branch-kicker">${ic('gitBranch')}当前报告分支</span><strong>${esc(branch.label)} · ${esc(branch.instanceId)}</strong><span>${esc(branch.strategy.id)} · ${esc(branch.strategy.name)} ${esc(branch.strategy.version)}</span></div><span class="status-pill ${esc(branch.badgeTone)} no-dot">${esc(branch.badge)}</span></div>${summary}<div class="downstream-grid"><section class="panel"><header class="panel-head"><div><h3>${esc(branch.label)} 成交与售后时间线</h3><p>只关联当前报告实例的结果，不改变交易状态</p></div><span class="status-pill info no-dot">P0 摘要</span></header><div class="panel-body downstream-timeline">${events}</div></section>${side}</div><div class="p1-boundary">${ic('sparkles')}<span><strong>P1 延展：</strong>将复检结果、售后差异和成交前报告按报告实例做结构化归因，形成责任域、问题聚类与策略建议；P0 仅保留可追溯的证据和结果摘要。</span></div><div class="stage-note">${ic('info')}<span>${esc(data.note)}</span></div>`;
+    return `<div class="branch-quote-banner"><div><span class="branch-kicker">${ic('gitBranch')}当前报告分支</span><strong>${esc(branch.label)} · ${esc(branch.instanceId)}</strong><span>${esc(buyers)} → ${esc(branch.strategy.id)} · ${esc(branch.strategy.name)} ${esc(branch.strategy.version)}</span></div><span class="status-pill ${esc(branch.badgeTone)} no-dot">${esc(branch.badge)}</span></div>${summary}<div class="downstream-grid"><section class="panel"><header class="panel-head"><div><h3>${esc(branch.label)} 成交与售后时间线</h3><p>只关联当前报告实例的结果，不改变交易状态</p></div><span class="status-pill info no-dot">P0 摘要</span></header><div class="panel-body downstream-timeline">${events}</div></section>${side}</div><div class="p1-boundary">${ic('sparkles')}<span><strong>P1 延展：</strong>将复检结果、售后差异和成交前报告按报告实例做结构化归因，形成责任域、问题聚类与策略建议；P0 仅保留可追溯的证据和结果摘要。</span></div><div class="stage-note">${ic('info')}<span>${esc(data.note)}</span></div>`;
   }
 
   function phoneIllustration(image, modal) {
@@ -504,9 +553,11 @@
 
   function openEvidenceModal(imageId) {
     const scenario = getScenario(state.activeScenarioId);
-    const image = scenario.images.find((item) => item.id === imageId);
+    const branch = getBranch(scenario, state.activeBranchId);
+    const image = branchImages(scenario, branch).find((item) => item.id === imageId);
     if (!image) return;
-    openModal(`<div class="modal-head"><div><h2 id="modalTitle">${esc(image.title)}</h2><p>${esc(scenario.orderNo)} · ${esc(image.meta)} · 脱敏演示图片</p></div><button class="modal-close" type="button" data-close-modal aria-label="关闭">${ic('x')}</button></div><div class="modal-body"><div class="evidence-modal-visual">${phoneIllustration(image, true)}</div><div class="evidence-modal-meta"><div><span>证据区域</span><strong>${esc(image.marker)}</strong></div><div><span>候选置信度</span><strong>${esc(image.confidence)}</strong></div><div><span>证据说明</span><strong>${esc(image.subtitle)}</strong></div></div><div class="stage-note">${ic('info')}<span>演示图片只用于说明证据查看交互，不代表真实设备或真实用户数据。正式实现需按图片权限控制访问并记录查看日志。</span></div></div>`);
+    const model = branchModel(scenario, branch);
+    openModal(`<div class="modal-head"><div><h2 id="modalTitle">${esc(image.title)}</h2><p>${esc(scenario.orderNo)} · ${esc(branch.label)} · ${esc(model.run || '')} · ${esc(image.meta)}</p></div><button class="modal-close" type="button" data-close-modal aria-label="关闭">${ic('x')}</button></div><div class="modal-body"><div class="evidence-modal-visual">${phoneIllustration(image, true)}</div><div class="evidence-modal-meta"><div><span>报告分支</span><strong>${esc(branch.label)} · ${esc(branch.instanceId)}</strong></div><div><span>证据区域</span><strong>${esc(image.marker)}</strong></div><div><span>候选置信度</span><strong>${esc(image.confidence)}</strong></div><div><span>证据说明</span><strong>${esc(image.subtitle)}</strong></div></div><div class="stage-note">${ic('info')}<span>演示图片只用于说明证据查看交互，不代表真实设备或真实用户数据。正式实现需按图片权限控制访问并记录查看日志。</span></div></div>`);
   }
 
   function openP1Modal(initialTab) {
@@ -533,7 +584,7 @@
   }
 
   function openHelpModal() {
-    openModal(`<div class="modal-head"><div><h2 id="modalTitle">P0 判定说明</h2><p>先定位报告分支，再解释该分支内的报告与报价；系统不评价跨报告的绝对高低</p></div><button class="modal-close" type="button" data-close-modal aria-label="关闭">${ic('x')}</button></div><div class="modal-body"><div class="p1-banner">${ic('info')}<div><strong>一单多报告，分支报价不合并</strong><p>同一订单可能因运营策略生成多份不同 AI 报告。图片、模型任务和原始标签按订单级证据保存；当前演示假设两份报告共用同一任务。标签选择、映射、报告、买家匹配、报价与售后归属各自的报告实例。</p></div></div><div class="scope-compare"><article><h3>规则执行一致</h3><p>当前报告分支的实际报价能够由该分支报告条件、命中的价格规则、实际取用价档和计价明细完整解释。成色与专项扣减项命中后跨档取价属于合法业务。</p></article><article><h3>规则链差异</h3><p>当前报告分支的实际报价与规则条件、优先级、实际价档或计价明细不一致。其他分支报价正常，不能抵消这个差异。</p></article><article><h3>证据不足</h3><p>缺少关键快照时只展示已知事实和缺口，降级为待确认线索，不生成确定性原因、责任或高低价结论。</p></article></div><div class="quote-notes">${ic('alertCircle')}<span><strong>不使用：</strong>其他报告分支金额、其他买家报价、历史成交、市场价、成本价或不同成色档的绝对价格作为自动高低基准。业务带入“偏高/偏低”线索后，系统只定位当前报告实例的规则执行链路。</span></div></div>`);
+    openModal(`<div class="modal-head"><div><h2 id="modalTitle">P0 判定说明</h2><p>先定位报告分支，再解释该分支内的报告与报价；系统不评价跨报告的绝对高低</p></div><button class="modal-close" type="button" data-close-modal aria-label="关闭">${ic('x')}</button></div><div class="modal-body"><div class="p1-banner">${ic('info')}<div><strong>一单多报告，分支并行保留</strong><p>每个买家独立配置策略，策略在报告生成前决定哪些买家使用该报告。同一订单可以按不同买家组并行派生多份报告，全部保留、不覆盖、不合并；各报告可拥有独立模型任务、输入、候选标签和阈值。</p></div></div><div class="scope-compare"><article><h3>规则执行一致</h3><p>当前报告分支的实际报价能够由该分支报告条件、命中的价格规则、实际取用价档和计价明细完整解释。成色与专项扣减项命中后跨档取价属于合法业务。</p></article><article><h3>规则链差异</h3><p>当前报告分支的实际报价与规则条件、优先级、实际价档或计价明细不一致。其他分支报价正常，不能抵消这个差异。</p></article><article><h3>证据不足</h3><p>缺少关键快照时只展示已知事实和缺口，降级为待确认线索，不生成确定性原因、责任或高低价结论。</p></article></div><div class="quote-notes">${ic('alertCircle')}<span><strong>不使用：</strong>其他报告分支金额、其他买家报价、历史成交、市场价、成本价或不同成色档的绝对价格作为自动高低基准。成交买家同步后按其独立策略自动归属报告。</span></div></div>`);
   }
 
   function openModal(contentHtml) {
@@ -610,7 +661,7 @@
       showToast('当前筛选下没有可导出的订单', 'error');
       return;
     }
-    const header = ['订单号', '设备', '门店', '渠道', '报告分支', '分支成色 / 问题项', '分支实际报价', '链路判定', '证据完整度'];
+    const header = ['订单号', '设备', '门店', '渠道', '买家策略归属', '报告分支', '分支成色 / 问题项', '独立模型任务', '分支实际报价', '链路判定', '证据完整度'];
     const lines = rows.map((item) => {
       const branches = branchesOf(item);
       return [
@@ -618,8 +669,10 @@
         `${item.device} ${item.specs}`,
         item.store,
         item.channel,
+        branches.map((branch) => `${branch.audience && branch.audience.buyers ? branch.audience.buyers.join('、') : branch.buyer} → ${branch.strategy.id} ${branch.strategy.version}`).join(' / '),
         branches.map((branch) => `${branch.label} ${branch.instanceId}`).join(' / '),
         branches.map((branch) => `${branch.label} ${branch.reportGrade}：${(branch.issues || []).join('、')}`).join(' / '),
+        branches.map((branch) => `${branch.label} ${branchModel(item, branch).run || '待补'}`).join(' / '),
         branches.map((branch) => `${branch.label} ${branch.amount}`).join(' / '),
         branches.map((branch) => `${branch.label} ${branch.badge}`).join(' / '),
         branches.map((branch) => `${branch.label} ${branch.completenessText}`).join(' / ')
@@ -639,23 +692,30 @@
       order: { order_no: scenario.orderNo, device: scenario.device, specs: scenario.specs, store: scenario.store, channel: scenario.channel, time: scenario.time },
       report_count: branches.length,
       branch_relationship: scenario.branchRelation || null,
-      shared_evidence: {
-        candidates: scenario.candidates,
-        images: scenario.images.map(({ id, title, meta, confidence }) => ({ id, title, meta, confidence })),
-        model: scenario.model,
-        stages: scenario.sharedStages || {}
+      order_evidence: {
+        stages: scenario.sharedStages || {},
+        buyer_strategy_assignments: branches.map((branch) => ({
+          buyers: branch.audience && branch.audience.buyers ? branch.audience.buyers : [branch.buyer],
+          strategy_id: branch.strategy.id,
+          strategy_version: branch.strategy.version,
+          report_instance_id: branch.instanceId
+        }))
       },
       report_branches: branches.map((branch) => ({
         branch_id: branch.id,
         report_instance_id: branch.instanceId,
+        audience: branch.audience || null,
         strategy: branch.strategy,
+        model: branchModel(scenario, branch),
+        images: branchImages(scenario, branch).map(({ id, title, meta, confidence }) => ({ id, title, meta, confidence })),
+        candidates: branchCandidates(scenario, branch),
         report: { grade: branch.reportGrade, issues: branch.issues },
         selected_labels: branch.selectedLabels || [],
         mappings: branch.mappings,
         quote: { actual_amount: branch.amountValue, amount_display: branch.amount, status: branch.quote.statusLabel, rules: branch.quote.rules, calculation: branch.quote.lines, difference: branch.quote.difference },
         downstream: branch.downstream,
         config_versions: branch.config,
-        stages: branchStages(scenario, branch)
+        stages: branch.stages || {}
       }))
     };
     downloadFile(`trace-${scenario.orderNo}-demo.json`, JSON.stringify(pack, null, 2), 'application/json;charset=utf-8');
@@ -665,7 +725,9 @@
   function copyCurrentSummary() {
     const scenario = getScenario(state.activeScenarioId);
     const branch = getBranch(scenario, state.activeBranchId);
-    const text = `【${scenario.orderNo}】${scenario.device} ${scenario.specs}\ntrace_id：${scenario.traceId}\n报告分支：${branch.label} · ${branch.instanceId}\n运营策略：${branch.strategy.id} · ${branch.strategy.name} ${branch.strategy.version}\nAI 报告：${branch.reportGrade} / ${branch.issues.join('、')}\n分支实际报价：${branch.amount}\n链路判定：${branch.badge}\n结论：${branch.verdict.title}\n${branch.verdict.description}`;
+    const model = branchModel(scenario, branch);
+    const buyers = branch.audience && branch.audience.buyers ? branch.audience.buyers.join('、') : branch.buyer;
+    const text = `【${scenario.orderNo}】${scenario.device} ${scenario.specs}\ntrace_id：${scenario.traceId}\n报告分支：${branch.label} · ${branch.instanceId}\n买家策略归属：${buyers} → ${branch.strategy.id} · ${branch.strategy.name} ${branch.strategy.version}\nAI 任务：${model.run || '待补'} · ${model.code || '—'} · ${model.input || '输入待补'}\nAI 报告：${branch.reportGrade} / ${branch.issues.join('、')}\n分支实际报价：${branch.amount}\n链路判定：${branch.badge}\n结论：${branch.verdict.title}\n${branch.verdict.description}`;
     copyText(text);
   }
 

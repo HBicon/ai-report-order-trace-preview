@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="AI 报告订单追溯链路 Gate 2 产品评审站：支持同一订单多份 AI 报告分支，向前追溯共享图片、原始标签与策略选择，向后追溯分支报价、成交与售后。">
+  <meta name="description" content="AI 报告订单追溯链路 Gate 2 产品评审站：支持同一订单多份并行 AI 报告，按报告分支追溯独立买家策略、模型任务、图片、候选标签、报价、成交与售后。">
   <title>AI 报告订单追溯链路 | Gate 2 产品评审站</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f766e'/%3E%3Cpath d='M17 34h8l4-10 6 20 4-10h8' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="assets/home.css">
@@ -27,15 +27,15 @@
       <div class="hero-inner">
         <p class="eyebrow">REQ-20261021-001 · Gate 2 方案评审</p>
         <h1>AI 报告订单追溯链路</h1>
-        <p class="hero-summary">以 AI 报告为中间锚点，先定位同一订单下的具体报告分支，再向前还原共享图片、模型、原始标签与运营策略选择，向后还原买家匹配、规则计价、实际报价、成交与售后。不同报告的结论和报价不合并。</p>
-        <div class="hero-meta"><span>版本 v1.1</span><span>Gate 1 已通过</span><span>Gate 2 方案评审中</span><span>更新于 2026-10-22</span><span>Owner 待确认</span></div>
+        <p class="hero-summary">以 AI 报告为中间锚点，先定位同一订单下的具体报告分支，再向前还原买家独立策略、独立模型任务、图片、候选标签与阈值，向后还原策略买家组报价、成交归属与售后。成交买家经其独立策略自动关联报告，不同报告的结论和报价不合并。</p>
+        <div class="hero-meta"><span>版本 v1.2</span><span>Gate 1 已通过</span><span>Gate 2 方案评审中</span><span>更新于 2026-10-22</span><span>Owner 待确认</span></div>
         <div class="review-link-row"><span>Gate 1 通过证据：需求方整体确认 7 项评审重点</span><a href="review-record/">查看评审记录 →</a></div>
       </div>
     </section>
 
     <section class="facts" aria-label="项目关键结论">
       <div class="facts-inner">
-        <div class="fact"><p class="fact-label">追溯锚点</p><p class="fact-value">报告实例</p><p class="fact-note">订单级证据，分支独立</p></div>
+        <div class="fact"><p class="fact-label">追溯锚点</p><p class="fact-value">报告实例</p><p class="fact-note">订单公共事实，分支证据独立</p></div>
         <div class="fact"><p class="fact-label">价格口径</p><p class="fact-value">分支实际报价</p><p class="fact-note">不合并、不跨分支比价</p></div>
         <div class="fact"><p class="fact-label">P0 场景</p><p class="fact-value">未报价 / 规则链差异</p><p class="fact-note">定位到具体报告分支</p></div>
         <div class="fact"><p class="fact-label">优化延展</p><p class="fact-value">策略与阈值建议</p><p class="fact-note">P1 建议，P2 变更验证</p></div>
@@ -58,13 +58,13 @@
         <a class="artifact prototype" href="prototype/">
           <div class="artifact-top"><span class="artifact-number">02</span><span class="artifact-status">Gate 2 评审中</span></div>
           <h3>交互原型</h3><p class="artifact-role">页面、状态与主流程</p>
-          <p class="artifact-description">覆盖六个案例：一单双报告、合法跨档取价、专项规则优先级异常、未报价、售后关联和证据不完整；含报告分支切换、分支对比、分支报价与共享 AI 证据。</p>
+          <p class="artifact-description">覆盖六个案例：一单双报告、合法跨档取价、专项规则优先级异常、未报价、售后关联和证据不完整；含报告分支切换、分支对比、分支报价与报告分支独立 AI 证据。</p>
           <div class="artifact-open"><span>进入原型</span><span>→</span></div>
         </a>
         <div class="artifact specification disabled" aria-disabled="true">
           <div class="artifact-top"><span class="artifact-number">03</span><span class="artifact-status">Gate 2 后生成</span></div>
           <h3>Specification</h3><p class="artifact-role">系统规则与验收合同</p>
-          <p class="artifact-description">将按 Capability → Requirement → Scenario 组织，覆盖订单级证据/报告分支快照、事件、权限、异常、证据完整度和分支价格口径。</p>
+          <p class="artifact-description">将按 Capability → Requirement → Scenario 组织，覆盖订单公共事实、买家策略归属、报告分支独立快照、事件、权限、异常、证据完整度和分支价格口径。</p>
           <div class="artifact-open"><span>等待 Gate 2</span><span>·</span></div>
         </div>
         <div class="artifact test-cases disabled" aria-disabled="true">
@@ -111,7 +111,7 @@
         <div class="gate">
           <p class="gate-step">GATE 2 · 进行中</p>
           <h3>方案评审</h3>
-          <p>等待业务、研发、测试确认报告分支模型、多报告并存与成交归属规则、分支切换/对比、分支报价、AI 证据、售后摘要、数据来源、角色权限和异常处理。</p>
+          <p>等待业务、研发、测试评审报告并行保留、买家策略预绑定、各分支独立模型任务、成交买家自动归属报告、分支切换/对比、分支报价、AI 证据、售后摘要、数据来源、角色权限和异常处理。</p>
         </div>
         <div class="gate">
           <p class="gate-step">GATE 3 · 未开始</p>
@@ -166,7 +166,7 @@
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <span>REQ-20261021-001 · AI 报告订单追溯链路 · v1.1 · 2026-10-22</span>
+      <span>REQ-20261021-001 · AI 报告订单追溯链路 · v1.2 · 2026-10-22</span>
       <div class="footer-links">
         <a href="proposal/">Proposal</a>
         <a href="prototype/">原型</a>
