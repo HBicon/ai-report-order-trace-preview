@@ -248,6 +248,64 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
 .case-chip:hover { border-color: #b3c0ca; }
 .case-chip.active { border-color: #80bdb6; color: var(--teal-dark); background: var(--teal-soft); font-weight: 700; }
 
+.branch-overview { margin-top: 12px; padding: 14px; border: 1px solid #cfdeda; border-radius: var(--radius); background: linear-gradient(180deg, #fbfefd 0%, #fff 100%); box-shadow: var(--shadow-sm); }
+.branch-overview.single { padding: 12px 14px; border-color: var(--line); background: #fff; }
+.branch-overview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.branch-overview-head h2 { margin: 3px 0 0; font-size: 13px; }
+.branch-overview-head p { margin: 4px 0 0; color: var(--muted); font-size: 8px; line-height: 1.55; }
+.branch-kicker { display: inline-flex; align-items: center; gap: 5px; color: var(--teal-dark); font-size: 8px; font-weight: 750; letter-spacing: .03em; }
+.branch-kicker .icon { width: 12px; height: 12px; }
+.branch-origin { margin-top: 11px; padding: 9px 11px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border: 1px solid #e4e9e6; border-radius: 5px; background: #fff; }
+.branch-origin-copy { min-width: 0; display: flex; align-items: flex-start; gap: 7px; }
+.branch-origin-copy > .icon { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; color: var(--teal); }
+.branch-origin-copy strong { display: block; color: var(--ink-soft); font-size: 8px; }
+.branch-origin-copy p { margin: 4px 0 0; color: var(--muted); font-size: 8px; line-height: 1.55; }
+.branch-origin-copy p span { margin: 0 3px; padding: 1px 4px; border-radius: 3px; color: var(--teal-dark); background: var(--teal-soft); font-family: "SFMono-Regular", Consolas, monospace; font-size: 7px; white-space: nowrap; }
+.branch-origin-note { margin: 6px 0 0; color: var(--subtle); font-size: 7px; line-height: 1.5; }
+.branch-card-grid { margin-top: 11px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.branch-card { min-width: 0; padding: 11px 12px; display: grid; gap: 5px; border: 1px solid #dfe7e6; border-radius: 6px; color: var(--ink-soft); background: #fff; text-align: left; transition: border-color .12s ease, box-shadow .12s ease, background .12s ease; }
+.branch-card:hover { border-color: #a9cbc5; background: #fbfefd; }
+.branch-card.active { border-color: #5eaaa1; background: #f6fcfa; box-shadow: inset 0 0 0 1px #8cc9c1; }
+.branch-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.branch-label { color: var(--teal-dark); font-size: 10px; font-weight: 800; }
+.branch-card > strong { color: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums; }
+.branch-strategy { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.branch-tags { min-height: 17px; display: flex; flex-wrap: wrap; gap: 4px; }
+.branch-tags i { padding: 2px 5px; border-radius: 3px; color: #596777; background: var(--surface-soft); font-size: 7px; font-style: normal; }
+.branch-card-foot { padding-top: 5px; display: flex; align-items: center; gap: 8px; border-top: 1px dashed #e5ebea; color: var(--subtle); font-size: 7px; }
+.branch-card-foot span:nth-child(2) { margin-left: auto; font-family: "SFMono-Regular", Consolas, monospace; }
+.branch-card-foot .icon { width: 11px; height: 11px; }
+.branch-chain-banner, .branch-quote-banner { margin-top: 14px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #d8e6e3; border-radius: 6px; background: #f6fbfa; }
+.branch-chain-banner > div, .branch-quote-banner > div { min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.branch-chain-banner > div > strong, .branch-quote-banner > div > strong { color: var(--ink); font-size: 10px; }
+.branch-chain-banner > div > span:last-child, .branch-quote-banner > div > span:last-child { color: var(--muted); font-size: 8px; }
+.branch-banner-note { max-width: 46%; color: var(--muted); font-size: 8px; line-height: 1.45; text-align: right; }
+.stage-scope { margin-top: 2px; padding: 1px 4px; border-radius: 3px; color: #4d7d77; background: #edf8f5; font-size: 6px; font-weight: 700; }
+.trace-stage.shared { border-style: dashed; background: #fbfdfc; }
+.amount-stack { display: grid; gap: 2px; color: var(--ink); font-size: 10px; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.amount-stack > span { display: flex; align-items: center; gap: 5px; }
+.amount-stack b { min-width: 12px; color: var(--teal-dark); font-size: 8px; }
+.amount-stack small { margin-top: 2px; color: var(--subtle); font-size: 7px; font-weight: 400; }
+.branch-share-card { padding: 12px 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border: 1px solid #d8e6e3; border-radius: var(--radius); background: #f8fcfb; }
+.branch-share-card > div { display: flex; align-items: flex-start; gap: 8px; }
+.branch-share-card .icon { width: 16px; height: 16px; flex: 0 0 auto; color: var(--teal); }
+.branch-share-card strong { display: block; color: var(--ink); font-size: 10px; }
+.branch-share-card p { margin: 4px 0 0; color: var(--muted); font-size: 8px; line-height: 1.55; }
+.branch-compare-table { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; box-shadow: var(--shadow-sm); }
+.branch-compare-table .data-table tbody tr { cursor: default; }
+.branch-compare-table .data-table tbody tr:hover { background: transparent; }
+.branch-compare-table .data-table th[scope="row"] { width: 132px; color: var(--ink-soft); background: #fbfcfd; font-size: 8px; }
+.branch-compare-table .data-table td { min-width: 190px; line-height: 1.5; }
+.compare-head { display: grid; gap: 3px; }
+.compare-head strong { color: var(--ink); font-size: 9px; }
+.compare-head span { color: var(--subtle); font-family: "SFMono-Regular", Consolas, monospace; font-size: 7px; }
+.compare-head .panel-link { margin-top: 2px; padding: 0; font-size: 8px; }
+.compare-head .panel-link .icon { width: 10px; height: 10px; }
+.branch-compare-notes { margin-top: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.branch-compare-notes > div { padding: 10px 11px; display: flex; align-items: flex-start; gap: 7px; border: 1px solid #e3e9ed; border-radius: 5px; color: #566575; background: #fbfcfd; font-size: 8px; line-height: 1.6; }
+.branch-compare-notes .icon { width: 13px; height: 13px; flex: 0 0 auto; margin-top: 1px; color: var(--blue); }
+.branch-compare-notes strong { color: var(--ink-soft); }
+
 .verdict-card { margin-top: 13px; padding: 15px 17px; position: relative; overflow: hidden; display: grid; grid-template-columns: 34px 1fr auto; align-items: flex-start; gap: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; box-shadow: var(--shadow-sm); }
 .verdict-card::before { content: ""; width: 3px; position: absolute; inset: 0 auto 0 0; background: var(--teal); }
 .verdict-card.warning::before { background: var(--amber); }
@@ -627,6 +685,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid #3b9b91; outline-
   .detail-actions { width: 100%; }
   .detail-actions .button { flex: 1; }
   .case-switcher { flex-wrap: wrap; }
+  .branch-card-grid { grid-template-columns: 1fr; }
+  .branch-overview-head, .branch-share-card { flex-direction: column; align-items: flex-start; }
+  .branch-origin { flex-direction: column; gap: 7px; }
+  .branch-chain-banner, .branch-quote-banner { align-items: flex-start; flex-direction: column; }
+  .branch-banner-note { max-width: none; text-align: left; }
+  .branch-compare-notes { grid-template-columns: 1fr; }
+  .branch-share-card { gap: 8px; }
   .verdict-card { grid-template-columns: 30px 1fr; }
   .verdict-meta { grid-column: 2; justify-items: start; grid-auto-flow: column; justify-content: start; align-items: center; }
   .completeness-ring { display: none; }
@@ -653,6 +718,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid #3b9b91; outline-
   .metric-card { padding: 13px; }
   .metric-value strong { font-size: 21px; }
   .detail-title-card { padding: 14px; }
+  .branch-overview { padding: 11px; }
+  .branch-card { padding: 10px; }
+  .verdict-copy header { display: grid; justify-items: start; gap: 6px; }
+  .verdict-copy header .status-pill { max-width: 100%; white-space: normal; }
   .order-heading { gap: 9px; }
   .device-mark { width: 34px; height: 34px; }
   .order-heading h1 { font-size: 16px; }

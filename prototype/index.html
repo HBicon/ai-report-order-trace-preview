@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#14232d">
-  <meta name="description" content="AI 报告订单追溯链路 Gate 2 可交互原型，面向内部运营的只读追溯工作台。">
+  <meta name="description" content="AI 报告订单追溯链路 Gate 2 可交互原型：面向内部运营，支持同一订单多份 AI 报告分支的只读追溯工作台。">
   <title>报价追溯台 · AI 报告订单追溯链路</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f766e'/%3E%3Cpath d='M17 34h8l4-10 6 20 4-10h8' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="../assets/app.css">
@@ -26,6 +26,7 @@
         <p class="sidebar-label">工作台</p>
         <nav class="side-nav">
           <button class="active" type="button" data-filter="all"><span class="icon" data-icon="dashboard"></span><span>追溯总览</span></button>
+          <button type="button" data-filter="dual"><span class="icon" data-icon="gitBranch"></span><span>一单双报告</span><span class="nav-tag">新</span></button>
           <button type="button" data-filter="unquoted"><span class="icon" data-icon="circleX"></span><span>未报价队列</span><span class="nav-count">18</span></button>
           <button type="button" data-filter="anomaly"><span class="icon" data-icon="alertCircle"></span><span>报价异常线索</span><span class="nav-count">7</span></button>
           <button type="button" data-filter="aftersales"><span class="icon" data-icon="receipt"></span><span>售后关联</span><span class="nav-count">3</span></button>
@@ -81,10 +82,10 @@
             <div>
               <p class="eyebrow">Operational trace</p>
               <h1 id="overviewTitle">报价追溯总览</h1>
-              <p class="heading-desc">以 AI 报告为锚点，先定位链路，再查看唯一实际报价的形成过程。</p>
+              <p class="heading-desc">先定位订单下的报告分支，再查看该分支的标签选择、报告、买家匹配与实际报价。</p>
             </div>
             <div class="heading-side">
-              <span class="date-chip"><span class="icon" data-icon="clock"></span>2026-10-21 · 今日</span>
+              <span class="date-chip"><span class="icon" data-icon="clock"></span>2026-10-22 · 今日</span>
               <button class="button" type="button" id="exportOverview"><span class="icon" data-icon="download"></span>导出当前视图</button>
             </div>
           </div>
@@ -137,12 +138,13 @@
 
           <section class="panel" aria-labelledby="queueTitle">
             <header class="panel-head">
-              <div><h2 id="queueTitle">待排查订单</h2><p id="queueSubtitle">演示数据 · 5 个典型案例，按排查优先级排列</p></div>
+              <div><h2 id="queueTitle">待排查订单</h2><p id="queueSubtitle">演示数据 · 6 个典型案例，按排查优先级排列</p></div>
               <button class="panel-link" type="button" id="queueHelp"><span class="icon" data-icon="info"></span>判定说明</button>
             </header>
             <div class="queue-toolbar">
               <div class="segmented" id="queueFilters" aria-label="订单类型筛选">
-                <button class="active" type="button" data-queue-filter="all">全部 <span id="countAll">5</span></button>
+                <button class="active" type="button" data-queue-filter="all">全部 <span id="countAll">6</span></button>
+                <button type="button" data-queue-filter="dual">一单双报告 <span>1</span></button>
                 <button type="button" data-queue-filter="unquoted">未报价 <span id="countUnquoted">1</span></button>
                 <button type="button" data-queue-filter="anomaly">规则链差异 <span id="countAnomaly">1</span></button>
                 <button type="button" data-queue-filter="aftersales">售后关联 <span id="countAftersales">1</span></button>
@@ -160,8 +162,8 @@
                   <tr>
                     <th scope="col">订单 / 设备</th>
                     <th scope="col">问题入口</th>
-                    <th scope="col">AI 报告</th>
-                    <th scope="col">唯一实际报价</th>
+                    <th scope="col">AI 报告 / 分支</th>
+                    <th scope="col">分支实际报价</th>
                     <th scope="col">链路判定</th>
                     <th scope="col">最近节点</th>
                     <th scope="col"><span class="sr-only">操作</span></th>
@@ -236,10 +238,12 @@
           </section>
 
           <div class="detail-facts" id="detailFacts"></div>
+          <div id="branchOverview"></div>
 
           <div class="detail-tabs" role="tablist" aria-label="追溯详情">
             <button class="detail-tab active" type="button" role="tab" aria-selected="true" data-detail-tab="chain">全链路<span class="tab-count">8</span></button>
-            <button class="detail-tab" type="button" role="tab" aria-selected="false" data-detail-tab="quote">报价规则</button>
+            <button class="detail-tab" type="button" role="tab" aria-selected="false" data-detail-tab="compare" hidden>分支对比</button>
+            <button class="detail-tab" type="button" role="tab" aria-selected="false" data-detail-tab="quote">分支报价</button>
             <button class="detail-tab" type="button" role="tab" aria-selected="false" data-detail-tab="evidence">AI 证据</button>
             <button class="detail-tab" type="button" role="tab" aria-selected="false" data-detail-tab="downstream">成交与售后</button>
             <span class="tab-context"><span class="icon" data-icon="shield"></span>使用报价时快照，不使用当前配置反推</span>

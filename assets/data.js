@@ -648,6 +648,285 @@
     }
   ];
 
+  const dualReport = {
+    id: 'dual',
+    filter: 'dual',
+    short: '一单双报告',
+    queueType: '双报告分支',
+    orderNo: 'SC-20261022-1042',
+    device: 'iPhone 16 Pro',
+    specs: '256GB · 沙漠色',
+    store: 'A09 虹桥店',
+    channel: '包销机器人',
+    time: '10:26',
+    operator: '运营一组',
+    traceId: 'TRC-9B4A-042D-2R7K',
+    reportCount: 2,
+    reportGrade: '2 份',
+    issues: [],
+    amount: '¥4,120 / ¥3,780',
+    amountValue: 4120,
+    amountLines: [
+      { label: 'A', value: '¥4,120' },
+      { label: 'B', value: '¥3,780' }
+    ],
+    buyer: 'B-301 / B-305',
+    completenessText: '分支证据完整',
+    completenessPct: 96,
+    completenessTone: 'warning',
+    badge: '分支 B 规则链差异',
+    badgeTone: 'warning',
+    branchRelation: {
+      status: 'parallel-demo',
+      label: '并行派生 · 演示假设',
+      reason: '订单同时命中 2 个运营策略，分别生成报告 A / B',
+      strategies: ['S-COLOR-03 · v3.2', 'S-SCREEN-02 · v2.7'],
+      sharedEvidence: true,
+      note: '当前演示假设两份报告共用模型任务 RUN-1042-7K；若实际为分支重跑，应改为各自记录 run_id，不能沿用同一份标签快照。'
+    },
+    model: {
+      code: 'CAM-X3.1', version: '2026.10.18', run: 'RUN-1042-7K',
+      threshold: '0.65 · THR-CAM-8', input: '4 图 / 11 项店员选择',
+      quality: '全部通过基础质量校验'
+    },
+    images: [
+      { id: 'dual-front', title: '正面图 · 屏幕区域', subtitle: '屏幕轻微划痕候选清晰，置信度 0.88', angle: 'screen', marker: '屏幕区域', confidence: '0.88', meta: 'IMG-01 · 2.7 MB' },
+      { id: 'dual-back', title: '背面图 · 后摄区域', subtitle: '后摄进灰候选置信度 0.93，当前演示假设为两份报告共用输入', angle: 'back', marker: '后摄区域', confidence: '0.93', meta: 'IMG-02 · 2.4 MB' },
+      { id: 'dual-frame', title: '侧面图 · 边框区域', subtitle: '边框磕碰候选置信度 0.81，仅报告 A 选择该标签', angle: 'frame', marker: '边框区域', confidence: '0.81', meta: 'IMG-03 · 2.1 MB' },
+      { id: 'dual-screen', title: '屏幕图 · 显示区域', subtitle: '主板维修候选低于阈值，不作为确定性报告项', angle: 'screen', marker: '显示区域', confidence: '0.44', meta: 'IMG-04 · 2.5 MB' }
+    ],
+    candidates: [
+      { label: '后摄像头进灰', type: '外观 / 摄像头', confidence: 0.93, threshold: 0.65, accepted: true, reason: '通过阈值，可进入策略选择' },
+      { label: '屏幕轻微划痕', type: '外观 / 屏幕', confidence: 0.88, threshold: 0.65, accepted: true, reason: '通过阈值，可进入策略选择' },
+      { label: '边框磕碰', type: '外观 / 边框', confidence: 0.81, threshold: 0.65, accepted: true, reason: '通过阈值，可进入策略选择' },
+      { label: '主板维修', type: '功能 / 主板', confidence: 0.44, threshold: 0.65, accepted: false, reason: '低于阈值，未进入策略选择' }
+    ],
+    sharedStages: {
+      order: stage('订单创建', 'fileText', 'ok', '10:25:58', '门店提交回收订单，包销机器人创建一次 AI 识别任务；订单同一，后续按命中的运营策略派生多个报告分支。', [
+        ['订单号', 'SC-20261022-1042'], ['进入方式', '自动触发'], ['门店 / 渠道', 'A09 虹桥店 / 包销机器人'], ['分支关系', '并行派生 · 待确认']
+      ], [['订单事件', 'EVT-ORDER-D42', 'fileText'], ['触发配置', 'TRIGGER-PB-03', 'gitBranch']], '订单只有一条主链路；报告分支数量由命中的运营策略决定。并行还是覆盖，当前按待确认处理。'),
+      input: stage('AI 输入（订单级）', 'image', 'ok', '10:26:05', '4 张设备图片、11 个店员选项送入图片模型 CAM-X3.1；当前演示假设两张报告共用一个模型任务。', [
+        ['模型 code', 'CAM-X3.1'], ['任务 ID（假设）', 'RUN-1042-7K'], ['图片数量', '4 张'], ['输入指纹', 'IN-42D9...7K']
+      ], [['输入快照', 'INPUT-1042 · 已冻结', 'database'], ['设备图片', 'IMG-01 至 IMG-04', 'image']], '当前演示假设共用输入；若实际分支重跑，应分别记录 input_hash 和 run_id，不能把分支差异误判为策略选择差异。'),
+      labels: stage('AI 原始标签（订单级）', 'scan', 'ok', '10:26:18', '同一模型任务返回 4 个候选标签，其中 3 个通过阈值；两份报告从这里开始选择不同标签。', [
+        ['采纳阈值', '0.65'], ['通过候选', '3 个'], ['未通过', '1 个'], ['关键标签', '后摄进灰 0.93 · 屏幕划痕 0.88']
+      ], [['原始响应', 'RAW-CAM-1042 · 已冻结', 'database'], ['候选标签快照', 'LAB-1042 · 4 行', 'tag']], '当前演示假设候选标签为订单级共用；后续才能判断分支差异来自策略选择还是模型输出。共享关系待研发确认。')
+    },
+    branches: [
+      {
+        id: 'A',
+        label: '报告 A',
+        instanceId: 'RI-1042-A',
+        strategy: { id: 'S-COLOR-03', name: '成色优先策略', version: 'v3.2', selected: '后摄进灰 + 边框磕碰' },
+        reportGrade: '大花',
+        issues: ['后摄像头进灰', '边框磕碰'],
+        amountValue: 4120,
+        amount: '¥4,120',
+        buyer: '合作买家 B-301',
+        completenessText: '证据完整',
+        completenessPct: 96,
+        completenessTone: 'warning',
+        badge: '分支 A 规则执行一致',
+        badgeTone: 'success',
+        selectedLabels: ['后摄像头进灰', '边框磕碰'],
+        verdict: {
+          tone: 'success',
+          icon: 'circleCheck',
+          label: '分支 A · 规则执行一致',
+          title: '报告 A 的报价可由本分支规则链完整解释',
+          description: '运营策略 S-COLOR-03 选取“后摄进灰 + 边框磕碰”，报告 A 为大花。买家 B-301 按大花价 4,300 扣减 120 和 60，实际报价 4,120。该金额只属于报告分支 A，不能与报告 B 合并、平均或跨报告比较。'
+        },
+        facts: [
+          { label: '当前报告', value: '报告 A', note: 'RI-1042-A · 大花' },
+          { label: '分支实际报价', value: '¥4,120', note: 'B-301 · 唯一报价对象' },
+          { label: '策略选用标签', value: '2 个', note: '后摄进灰 · 边框磕碰' },
+          { label: '分支结果', value: '已报价', note: '成交分支待确认' }
+        ],
+        stages: {
+          mapping: stage('分支策略与标签映射', 'gitBranch', 'ok', '10:26:20', '运营策略 S-COLOR-03 从共享候选标签中选择 2 个，并映射为大花报告项。', [
+            ['运营策略', 'S-COLOR-03 · v3.2'], ['选用标签', '后摄进灰 · 边框磕碰'], ['映射版本', 'MAP-V12.4'], ['未选标签', '屏幕轻微划痕']
+          ], [['策略配置', 'STR-SCOLOR-03-V3.2 · 已冻结', 'gitBranch'], ['映射决策', 'MAP-1042-A · 2 行', 'fileText']], '分支差异首先记录“选哪些 AI 标签”，不能只比较最终成色。'),
+          report: stage('AI 报告 A', 'fileText', 'ok', '10:26:22', '报告实例 RI-1042-A 生成：大花，2 个扣减项，分别引用订单级原始标签。', [
+            ['报告实例', 'RI-1042-A'], ['报告成色', '大花'], ['问题项', '后摄进灰 · 边框磕碰'], ['扣减合计', '-180']
+          ], [['报告快照', 'RPT-1042-A · 已冻结', 'fileText'], ['标签引用', 'LAB-1042-001 / 004', 'tag']], '每份报告在分支内唯一；订单级可以同时存在多个报告实例。'),
+          eligibility: stage('分支 A 买家匹配', 'users', 'ok', '10:26:23', '按报告 A、渠道和买家资格匹配，B-301 进入报价。', [
+            ['进入匹配', '3 个买家'], ['符合报告条件', '1 个买家'], ['目标买家', 'B-301'], ['资格版本', 'ELIG-V6.3']
+          ], [['买家分支', 'BUY-B301 · 匹配成功', 'users'], ['排除原因', '其他买家成色范围不匹配', 'filter']], '买家匹配绑定报告实例 A，不继承报告 B 的匹配结果。'),
+          quote: stage('分支 A 报价决策', 'receipt', 'ok', '10:26:24', '大花价 4,300，扣减后摄进灰 120、边框磕碰 60，分支 A 实际报价 4,120。', [
+            ['命中规则', 'PR-0701 · 优先级 30'], ['取用价档', '大花价 4,300'], ['扣减合计', '-180'], ['分支实际报价', '4,120']
+          ], [['规则命中快照', 'QUOTE-1042-A · PR-0701', 'gitBranch'], ['计价明细', 'LINE-1042-A · 3 行', 'receipt']], '报告 A 与买家 B-301 形成独立报价尝试；该价格不外推为整单唯一价格。'),
+          downstream: stage('分支 A 成交与售后', 'packageCheck', 'warn', '—', '分支 A 已有有效报价；订单存在两份报告，最终成交采用哪个分支尚未由业务规则确认。', [
+            ['分支结果', '已报价 · B-301'], ['成交', '未确认'], ['售后', '未关联'], ['待确认', '成交分支选择规则']
+          ], [['报价记录', 'QUOTE-1042-A · 已生成', 'receipt']], '在成交分支规则未确认前，追溯不能把分支 A 的价格写成整单成交价。')
+        },
+        events: [
+          ['10:26:18', '订单级原始标签完成', 'LAB-1042 · 3 个候选通过阈值', 'ok'],
+          ['10:26:20', '策略 A 选择标签', '后摄进灰 + 边框磕碰', 'ok'],
+          ['10:26:22', '生成报告 A', 'RI-1042-A · 大花', 'ok'],
+          ['10:26:23', '匹配买家 B-301', '报告 A 条件与买家资格匹配', 'ok'],
+          ['10:26:24', '生成分支报价 A', '大花价 4,300 − 180 = 4,120', 'ok']
+        ],
+        config: [
+          { name: '运营策略', used: 'S-COLOR-03 · v3.2', current: 'S-COLOR-03 · v3.3', changed: true, note: '当前版本未参与本单' },
+          { name: '标签映射', used: 'MAP-V12.4', current: 'MAP-V12.4', changed: false, note: '' },
+          { name: '价格规则', used: 'PRICE-B301-V4.1', current: 'PRICE-B301-V4.1', changed: false, note: '' },
+          { name: '模型阈值', used: 'THR-CAM-0.65', current: 'THR-CAM-0.68', changed: true, note: '共享阈值快照' }
+        ],
+        mappings: [
+          { source: '后摄像头进灰', type: '外观 / 摄像头', option: '外观 → 后摄进灰', severity: '中', report: '扣减项 · -120', filtered: false },
+          { source: '边框磕碰', type: '外观 / 边框', option: '边框 → 磕碰', severity: '轻', report: '扣减项 · -60', filtered: false },
+          { source: '屏幕轻微划痕', type: '外观 / 屏幕', option: '未被本策略选取', severity: '—', report: '未进入报告 A', filtered: true }
+        ],
+        quote: {
+          amount: '4,120', amountRaw: 4120,
+          statusLabel: '规则执行一致', statusTone: 'success',
+          attempt: 'QUOTE-1042-A01', buyer: '合作买家 B-301',
+          rules: [
+            { priority: 30, id: 'PR-0701', name: '大花通用成色规则', condition: '成色 = 大花', action: '取大花价 4,300 并执行扣减', result: '命中', tone: 'success', hit: true },
+            { priority: 10, id: 'PR-0001', name: '买家兜底规则', condition: '无其他规则命中', action: '按买家兜底策略处理', result: '不适用', tone: 'neutral', hit: false }
+          ],
+          lines: [
+            { label: '大花成色价', source: 'PR-0701 实际取价档 · 价格配置 PRICE-B301-V4.1', amount: 4300, kind: 'base' },
+            { label: '后摄像头进灰', source: '扣减配置 D-036 · 分支 A 执行一次', amount: -120, kind: 'deduction' },
+            { label: '边框磕碰', source: '扣减配置 D-018 · 分支 A 执行一次', amount: -60, kind: 'deduction' }
+          ],
+          total: '4,120', totalNote: '报告 A · 买家 B-301 的实际报价',
+          difference: {
+            good: true,
+            title: '分支 A 的报告、规则与报价完整勾稽',
+            description: '该分支选用的标签、报告成色、价格规则和计价明细一致。系统只确认分支 A 执行正确，不据此评价分支 B 或整单价格。',
+            items: [
+              ['分支标识', 'RI-1042-A'],
+              ['实际取用价档', '大花价 4,300'],
+              ['分支实际报价', '4,120 · B-301']
+            ]
+          }
+        },
+        downstream: {
+          summary: [
+            { label: '分支买家', value: 'B-301', note: '合作买家' },
+            { label: '分支实际报价', value: '¥4,120', note: '仅属于报告 A' },
+            { label: '成交分支', value: '待确认', note: '订单存在 2 份报告' },
+            { label: '售后', value: '未关联', note: '尚未成交' }
+          ],
+          events: [
+            ['10:26', '分支 A 生成实际报价', 'B-301 · 4,120', 'ok'],
+            ['—', '成交分支选择待确认', '不能由追溯系统自行选择报告 A 或 B', 'warn']
+          ],
+          afterSale: null,
+          note: '订单存在多个报告分支时，成交与售后必须继续归属到实际采用的报告实例；当前示例不伪造成交结果。'
+        }
+      },
+      {
+        id: 'B',
+        label: '报告 B',
+        instanceId: 'RI-1042-B',
+        strategy: { id: 'S-SCREEN-02', name: '屏幕专项策略', version: 'v2.7', selected: '后摄进灰 + 屏幕划痕' },
+        reportGrade: '中花',
+        issues: ['后摄像头进灰', '屏幕轻微划痕'],
+        amountValue: 3780,
+        amount: '¥3,780',
+        buyer: '合作买家 B-305',
+        completenessText: '证据完整',
+        completenessPct: 92,
+        completenessTone: 'warning',
+        badge: '分支 B 规则链差异',
+        badgeTone: 'danger',
+        selectedLabels: ['后摄像头进灰', '屏幕轻微划痕'],
+        verdict: {
+          tone: 'danger',
+          icon: 'alertCircle',
+          label: '分支 B · 规则链差异',
+          title: '专项规则满足条件，但被更高优先级通用规则抢先命中',
+          description: '运营策略 S-SCREEN-02 选取“后摄进灰 + 屏幕划痕”，报告 B 为中花。专项规则 PR-0904 本应按大花价取价，但通用规则 PR-0701 优先级 30 高于专项规则 15，最终取中花价 4,000，扣减 220，实际报价 3,780。结论仅针对报告 B。'
+        },
+        facts: [
+          { label: '当前报告', value: '报告 B', note: 'RI-1042-B · 中花' },
+          { label: '分支实际报价', value: '¥3,780', note: 'B-305 · 唯一报价对象' },
+          { label: '策略选用标签', value: '2 个', note: '后摄进灰 · 屏幕划痕' },
+          { label: '首个差异', value: '规则优先级', note: 'PR-0904 未命中' }
+        ],
+        stages: {
+          mapping: stage('分支策略与标签映射', 'gitBranch', 'ok', '10:26:21', '运营策略 S-SCREEN-02 从同一批共享候选标签中选择另外 2 个，并生成中花报告项。', [
+            ['运营策略', 'S-SCREEN-02 · v2.7'], ['选用标签', '后摄进灰 · 屏幕划痕'], ['映射版本', 'MAP-V12.6'], ['未选标签', '边框磕碰']
+          ], [['策略配置', 'STR-SSCREEN-02-V2.7 · 已冻结', 'gitBranch'], ['映射决策', 'MAP-1042-B · 2 行', 'fileText']], '两份报告共用原始标签，但标签选择不同；这是“同输入、不同策略、不同报告”的关键证据。'),
+          report: stage('AI 报告 B', 'fileText', 'ok', '10:26:23', '报告实例 RI-1042-B 生成：中花，2 个扣减项，与报告 A 使用不同的标签组合。', [
+            ['报告实例', 'RI-1042-B'], ['报告成色', '中花'], ['问题项', '后摄进灰 · 屏幕划痕'], ['扣减合计', '-220']
+          ], [['报告快照', 'RPT-1042-B · 已冻结', 'fileText'], ['标签引用', 'LAB-1042-001 / 002', 'tag']], '报告 B 是独立快照，不覆盖报告 A，也不被报告 A 的结论覆盖。'),
+          eligibility: stage('分支 B 买家匹配', 'users', 'ok', '10:26:24', '按报告 B、渠道和买家资格匹配，B-305 进入报价。', [
+            ['进入匹配', '4 个买家'], ['符合报告条件', '1 个买家'], ['目标买家', 'B-305'], ['资格版本', 'ELIG-V6.3']
+          ], [['买家分支', 'BUY-B305 · 匹配成功', 'users'], ['排除原因', '其他买家渠道或成色范围不匹配', 'filter']], '不同报告可以匹配不同买家；买家结果必须归属到报告实例 B。'),
+          quote: stage('分支 B 报价决策', 'receipt', 'error', '10:26:25', '专项 PR-0904 满足“中花 + 屏幕划痕”条件，但优先级 15 低于通用规则 30；最终取中花价 4,000，扣减 220，分支实际报价 3,780。', [
+            ['满足条件规则', 'PR-0904 与 PR-0701'], ['实际命中', 'PR-0701 · 优先级 30'], ['未命中', 'PR-0904 · 优先级 15'], ['分支实际报价', '3,780']
+          ], [['规则命中快照', 'QUOTE-1042-B · PR-0701', 'gitBranch'], ['价档取用记录', '中花价 4,000', 'receipt']], '这是分支 B 内的真实规则链差异；不能因为分支 A 报价正常就忽略。'),
+          downstream: stage('分支 B 成交与售后', 'packageCheck', 'warn', '—', '分支 B 已生成报价，但规则链存在差异；订单最终采用哪个报告分支尚未确认。', [
+            ['分支结果', '已报价 · B-305'], ['规则链', '差异待修正'], ['成交', '未确认'], ['售后', '未关联']
+          ], [['报价记录', 'QUOTE-1042-B · 已生成', 'receipt'], ['异常快照', 'RULE-DIFF-1042-B', 'alert']], '分支 B 的异常需独立处理；是否成交、由哪个买家成交仍需业务规则确认。')
+        },
+        events: [
+          ['10:26:18', '订单级原始标签完成', 'LAB-1042 · 3 个候选通过阈值', 'ok'],
+          ['10:26:21', '策略 B 选择标签', '后摄进灰 + 屏幕划痕', 'ok'],
+          ['10:26:23', '生成报告 B', 'RI-1042-B · 中花', 'ok'],
+          ['10:26:24', '匹配买家 B-305', '报告 B 条件与买家资格匹配', 'ok'],
+          ['10:26:25', '规则选择异常', 'PR-0701 优先级 30 > PR-0904 优先级 15', 'error']
+        ],
+        config: [
+          { name: '运营策略', used: 'S-SCREEN-02 · v2.7', current: 'S-SCREEN-02 · v2.7', changed: false, note: '' },
+          { name: '标签映射', used: 'MAP-V12.6', current: 'MAP-V12.6', changed: false, note: '' },
+          { name: '价格规则', used: 'PRICE-B305-V6.3', current: 'PRICE-B305-V6.4', changed: true, note: '当前版本未参与本单' },
+          { name: '模型阈值', used: 'THR-CAM-0.65', current: 'THR-CAM-0.68', changed: true, note: '共享阈值快照' }
+        ],
+        mappings: [
+          { source: '后摄像头进灰', type: '外观 / 摄像头', option: '外观 → 后摄进灰', severity: '中', report: '扣减项 · -120', filtered: false },
+          { source: '屏幕轻微划痕', type: '外观 / 屏幕', option: '屏幕 → 轻微划痕', severity: '中', report: '扣减项 · -100', filtered: false },
+          { source: '边框磕碰', type: '外观 / 边框', option: '未被本策略选取', severity: '—', report: '未进入报告 B', filtered: true }
+        ],
+        quote: {
+          amount: '3,780', amountRaw: 3780,
+          statusLabel: '规则链差异', statusTone: 'danger',
+          attempt: 'QUOTE-1042-B01', buyer: '合作买家 B-305',
+          rules: [
+            { priority: 15, id: 'PR-0904', name: '中花 + 屏幕划痕专项', condition: '成色 = 中花 且 扣减项包含 屏幕轻微划痕', action: '应指定取大花价，但本次未被选择', result: '未命中 · 优先级较低', tone: 'warning', hit: false },
+            { priority: 30, id: 'PR-0701', name: '通用成色规则', condition: '成色 = 中花', action: '实际取中花价 4,000，执行扣减', result: '命中 · 与业务预期不符', tone: 'danger', hit: true },
+            { priority: 10, id: 'PR-0001', name: '买家兜底规则', condition: '无其他规则命中', action: '按买家兜底策略处理', result: '不适用', tone: 'neutral', hit: false }
+          ],
+          lines: [
+            { label: '中花成色价', source: 'PR-0701 实际取价档 · 价格配置 PRICE-B305-V6.3', amount: 4000, kind: 'base' },
+            { label: '后摄像头进灰', source: '扣减配置 D-036 · 分支 B 执行一次', amount: -120, kind: 'deduction' },
+            { label: '屏幕轻微划痕', source: '扣减配置 D-041 · 分支 B 执行一次', amount: -100, kind: 'deduction' }
+          ],
+          total: '3,780', totalNote: '报告 B · 买家 B-305 的实际报价',
+          difference: {
+            good: false,
+            title: '首个差异：专项规则优先级低于通用规则',
+            description: '专项规则 PR-0904 已满足条件，但优先级 15 低于通用规则 PR-0701 的 30，报价使用了通用中花价。页面只展示报告 B 的实际报价 3,780，不生成“应有报价”。',
+            items: [
+              ['首个差异', '专项规则优先级低于通用规则'],
+              ['实际取用价档', '中花价 4,000'],
+              ['分支实际报价', '3,780 · B-305']
+            ]
+          }
+        },
+        downstream: {
+          summary: [
+            { label: '分支买家', value: 'B-305', note: '合作买家' },
+            { label: '分支实际报价', value: '¥3,780', note: '仅属于报告 B' },
+            { label: '成交分支', value: '待确认', note: '订单存在 2 份报告' },
+            { label: '售后', value: '未关联', note: '尚未成交' }
+          ],
+          events: [
+            ['10:26', '分支 B 生成实际报价', 'B-305 · 3,780', 'warn'],
+            ['—', '成交分支选择待确认', '不能由追溯系统自行选择报告 A 或 B', 'warn']
+          ],
+          afterSale: null,
+          note: '若订单最终按报告 B 成交，售后应关联 RI-1042-B；若按报告 A 成交，则售后必须关联 RI-1042-A。'
+        }
+      }
+    ]
+  };
+
+  scenarios.unshift(dualReport);
+
   window.TRACE_SCENARIOS = scenarios;
   window.STAGE_ORDER = ['order', 'input', 'labels', 'mapping', 'report', 'eligibility', 'quote', 'downstream'];
 })();

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="AI 报告订单追溯链路 Gate 2 产品评审站：以 AI 报告为锚点，向前追溯图片、标签和映射，向后追溯唯一实际报价、成交与售后。">
+  <meta name="description" content="AI 报告订单追溯链路 Gate 2 产品评审站：支持同一订单多份 AI 报告分支，向前追溯共享图片、原始标签与策略选择，向后追溯分支报价、成交与售后。">
   <title>AI 报告订单追溯链路 | Gate 2 产品评审站</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f766e'/%3E%3Cpath d='M17 34h8l4-10 6 20 4-10h8' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="assets/home.css">
@@ -27,17 +27,17 @@
       <div class="hero-inner">
         <p class="eyebrow">REQ-20261021-001 · Gate 2 方案评审</p>
         <h1>AI 报告订单追溯链路</h1>
-        <p class="hero-summary">以 AI 报告为中间锚点，向前还原图片、模型、原始标签与标签映射，向后还原买家匹配、价格规则、唯一实际报价、成交与售后。P0 聚焦未报价和报价规则执行异常，不建设泛化日志平台，不回溯历史订单，不修改报告、配置、价格或订单。</p>
-        <div class="hero-meta"><span>版本 v0.9</span><span>Gate 1 已通过</span><span>Gate 2 方案评审中</span><span>更新于 2026-10-21</span><span>Owner 待确认</span></div>
+        <p class="hero-summary">以 AI 报告为中间锚点，先定位同一订单下的具体报告分支，再向前还原共享图片、模型、原始标签与运营策略选择，向后还原买家匹配、规则计价、实际报价、成交与售后。不同报告的结论和报价不合并。</p>
+        <div class="hero-meta"><span>版本 v1.1</span><span>Gate 1 已通过</span><span>Gate 2 方案评审中</span><span>更新于 2026-10-22</span><span>Owner 待确认</span></div>
         <div class="review-link-row"><span>Gate 1 通过证据：需求方整体确认 7 项评审重点</span><a href="review-record/">查看评审记录 →</a></div>
       </div>
     </section>
 
     <section class="facts" aria-label="项目关键结论">
       <div class="facts-inner">
-        <div class="fact"><p class="fact-label">追溯锚点</p><p class="fact-value">AI 报告</p><p class="fact-note">向前看依据，向后看结果</p></div>
-        <div class="fact"><p class="fact-label">价格口径</p><p class="fact-value">唯一实际报价</p><p class="fact-note">不设第二价格或重算价</p></div>
-        <div class="fact"><p class="fact-label">P0 场景</p><p class="fact-value">未报价 / 规则链差异</p><p class="fact-note">只核对本单规则是否执行</p></div>
+        <div class="fact"><p class="fact-label">追溯锚点</p><p class="fact-value">报告实例</p><p class="fact-note">订单级证据，分支独立</p></div>
+        <div class="fact"><p class="fact-label">价格口径</p><p class="fact-value">分支实际报价</p><p class="fact-note">不合并、不跨分支比价</p></div>
+        <div class="fact"><p class="fact-label">P0 场景</p><p class="fact-value">未报价 / 规则链差异</p><p class="fact-note">定位到具体报告分支</p></div>
         <div class="fact"><p class="fact-label">优化延展</p><p class="fact-value">策略与阈值建议</p><p class="fact-note">P1 建议，P2 变更验证</p></div>
       </div>
     </section>
@@ -52,19 +52,19 @@
         <a class="artifact proposal" href="proposal/">
           <div class="artifact-top"><span class="artifact-number">01</span><span class="artifact-status">Gate 1 已确认</span></div>
           <h3>Proposal</h3><p class="artifact-role">问题、范围与关键决策</p>
-          <p class="artifact-description">说明为什么做、为谁做、P0/P1/P2 边界，以及唯一价格、跨档取价、未报价原因和置信度阈值的确认口径。</p>
+          <p class="artifact-description">说明为什么做、为谁做、P0/P1/P2 边界，以及一单多报告、分支实际报价、跨档取价、未报价原因和置信度阈值的确认口径。</p>
           <div class="artifact-open"><span>阅读方案</span><span>→</span></div>
         </a>
         <a class="artifact prototype" href="prototype/">
           <div class="artifact-top"><span class="artifact-number">02</span><span class="artifact-status">Gate 2 评审中</span></div>
           <h3>交互原型</h3><p class="artifact-role">页面、状态与主流程</p>
-          <p class="artifact-description">覆盖五个案例：合法跨档取价、专项规则优先级异常、未报价、售后关联和证据不完整；含报价规则页与 AI 证据核对。</p>
+          <p class="artifact-description">覆盖六个案例：一单双报告、合法跨档取价、专项规则优先级异常、未报价、售后关联和证据不完整；含报告分支切换、分支对比、分支报价与共享 AI 证据。</p>
           <div class="artifact-open"><span>进入原型</span><span>→</span></div>
         </a>
         <div class="artifact specification disabled" aria-disabled="true">
           <div class="artifact-top"><span class="artifact-number">03</span><span class="artifact-status">Gate 2 后生成</span></div>
           <h3>Specification</h3><p class="artifact-role">系统规则与验收合同</p>
-          <p class="artifact-description">将按 Capability → Requirement → Scenario 组织，覆盖快照、事件、权限、异常、证据完整度和唯一价格口径。</p>
+          <p class="artifact-description">将按 Capability → Requirement → Scenario 组织，覆盖订单级证据/报告分支快照、事件、权限、异常、证据完整度和分支价格口径。</p>
           <div class="artifact-open"><span>等待 Gate 2</span><span>·</span></div>
         </div>
         <div class="artifact test-cases disabled" aria-disabled="true">
@@ -85,7 +85,7 @@
     <section class="preview-band" id="prototype-preview">
       <div class="preview-inner">
         <div class="preview-head">
-          <div><p class="section-index">02 · 原型预览</p><h2>先看链路，再看唯一实际报价</h2><p>预览为静态页面嵌入，完整筛选、页签、证据弹窗和案例切换请进入原型。</p></div>
+          <div><p class="section-index">02 · 原型预览</p><h2>先定位报告分支，再看该分支实际报价</h2><p>预览为静态页面嵌入，完整筛选、分支切换、分支对比、证据弹窗和案例切换请进入原型。</p></div>
           <a class="preview-link" href="prototype/">进入完整原型 →</a>
         </div>
         <div class="prototype-window" aria-label="原型预览窗口">
@@ -106,12 +106,12 @@
         <div class="gate">
           <p class="gate-step">GATE 1 · 已通过</p>
           <h3>范围确认</h3>
-          <p>2026-10-21 需求方确认四快照、P0 场景、未报价原因复用、只读边界、唯一实际报价、跨档取价合法性和 P1/P2 优化边界。</p>
+          <p>2026-10-21 需求方确认四快照、P0 场景、未报价原因复用、只读边界、唯一实际报价、跨档取价合法性和 P1/P2 优化边界。2026-10-22 补充“一个订单可能生成多份报告”，范围修正进入 Gate 2 复评。</p>
         </div>
         <div class="gate">
           <p class="gate-step">GATE 2 · 进行中</p>
           <h3>方案评审</h3>
-          <p>等待业务、研发、测试确认入口、主链路、报价规则页、AI 证据、售后摘要、数据来源、角色权限和异常处理。</p>
+          <p>等待业务、研发、测试确认报告分支模型、多报告并存与成交归属规则、分支切换/对比、分支报价、AI 证据、售后摘要、数据来源、角色权限和异常处理。</p>
         </div>
         <div class="gate">
           <p class="gate-step">GATE 3 · 未开始</p>
@@ -137,7 +137,8 @@
             <h3>本期包含</h3>
             <ul>
               <li>上线后新订单的端到端 trace_id 与事件链路</li>
-              <li>AI 输入、原始输出、报告与报价决策四类快照</li>
+              <li>订单级输入/任务引用与报告分支独立快照</li>
+              <li>同一订单多份报告的分支切换、对比与独立报价追溯</li>
               <li>未报价队列与首个阻断点定位</li>
               <li>“报告条件 → 规则优先级 → 实际价档 → 扣减/加价 → 实际报价”还原</li>
               <li>候选标签、原始置信度、阈值和映射决策路径留存</li>
@@ -150,6 +151,7 @@
             <ul>
               <li>不回溯、不重算、不迁移上线前历史订单</li>
               <li>不修改 AI 报告，不设计人工改判流程</li>
+              <li>不把同一订单的多份报告合并为一份或一个成交价</li>
               <li>不新增“应得报价”“成本价”“市场价”或第二价格</li>
               <li>不基于其他买家、历史成交或跨档价格自动判断高低</li>
               <li>不自动修改配置、模型阈值、报价或订单状态</li>
@@ -164,7 +166,7 @@
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <span>REQ-20261021-001 · AI 报告订单追溯链路 · v0.9 · 2026-10-21</span>
+      <span>REQ-20261021-001 · AI 报告订单追溯链路 · v1.1 · 2026-10-22</span>
       <div class="footer-links">
         <a href="proposal/">Proposal</a>
         <a href="prototype/">原型</a>
