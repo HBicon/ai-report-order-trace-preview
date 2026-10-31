@@ -15,24 +15,29 @@
   const state = {
     filter: 'all',
     queueQuery: '',
+    ledgerModel: 'all',
+    ledgerAftersale: 'all',
     activeScenarioId: 'dual',
     activeBranchId: 'B',
     activeTab: 'chain',
     activeStage: 'report',
     p1Tab: 'strategy',
     lastFocus: null,
-    modalOpen: false
+    modalOpen: false,
+    drawerKey: null,
+    drawerOpen: false,
+    lastDrawerFocus: null
   };
 
   const stageLabels = { ok: '正常', warn: '需关注', error: '异常', muted: '未发生' };
   const filterLabels = {
-    all: '全部案例',
+    all: '全部报告',
     dual: '一单双报告',
     unquoted: '未报价',
-    anomaly: '规则链差异',
+    anomaly: '不支持',
     aftersales: '售后关联',
-    incomplete: '证据不完整',
-    consistent: '规则执行一致'
+    incomplete: '待补证',
+    consistent: '支持'
   };
   const queueOrder = ['dual', 'priority', 'unquoted', 'aftersales', 'incomplete', 'normal'];
   const stageJudgements = {
@@ -54,11 +59,18 @@
 
   function branchesOf(scenario) {
     if (Array.isArray(scenario.branches) && scenario.branches.length) return scenario.branches;
+    const reportStage = scenario.stages && scenario.stages.report;
+    const reportCode = reportStage ? (reportStage.facts.find(([label]) => label === '报告版本') || [])[1] || scenario.traceId : scenario.traceId;
+    const buyerIds = String(scenario.buyer || '').replace(/^合作买家\s*/, '').split(/\s*\/\s*/).filter(Boolean);
     return [{
       id: 'single',
       label: '报告 A',
-      instanceId: scenario.stages && scenario.stages.report ? (scenario.stages.report.facts.find(([label]) => label === '报告版本') || [])[1] || scenario.traceId : scenario.traceId,
-      strategy: { id: '—', name: '单一报告策略', version: '—', selected: scenario.issues.join(' · ') || '报告项待核' },
+      instanceId: reportCode,
+      reportId: reportCode,
+      reportVersion: '报价时快照',
+      audience: { label: '策略买家组', buyers: buyerIds, note: '演示单报告案例；正式数据由买家独立策略归属记录提供' },
+      strategy: scenario.reportStrategy || { id: '策略快照待补', name: '单报告策略', version: '—', selected: scenario.issues.join(' · ') || '报告项待核' },
+      staffReport: scenario.staffReport || '店员上报快照待补',
       reportGrade: scenario.reportGrade,
       issues: scenario.issues,
       amount: scenario.amount,
@@ -71,11 +83,15 @@
       verdict: scenario.verdict,
       facts: scenario.facts,
       stages: scenario.stages,
+      model: scenario.model,
+      images: scenario.images,
+      candidates: scenario.candidates,
       events: scenario.events,
       config: scenario.config,
       mappings: scenario.mappings,
       quote: scenario.quote,
-      downstream: scenario.downstream
+      downstream: scenario.downstream,
+      selectedLabels: scenario.issues
     }];
   }
 
@@ -110,61 +126,231 @@
     return branchData(scenario, branch, 'model') || {};
   }
 
+  function branchStrategy(scenario, branch) {
+    return branch.strategy || scenario.reportStrategy || { id: '策略快照待补', name: '买家策略', version: '—', selected: '—' };
+  }
+
+  function branchAudience(scenario, branch) {
+    if (branch.audience && Array.isArray(branch.audience.buyers) && branch.audience.buyers.length) return branch.audience;
+    const buyers = String(branch.buyer || scenario.buyer || '').replace(/^合作买家\s*/, '').split(/\s*\/\s*/).filter(Boolean);
+    return { label: '策略买家组', buyers, note: '买家策略归属快照' };
+  }
+
+  function branchQuote(scenario, branch) {
+    return branch.quote || scenario.quote || { amount: branch.amount, amountRaw: branch.amountValue, rules: [], lines: [], difference: { items: [] } };
+  }
+
+  function branchDownstream(scenario, branch) {
+    return branch.downstream || scenario.downstream || { summary: [], events: [], afterSale: null };
+  }
+
+  function branchStaffReport(scenario, branch) {
+    return branch.staffReport || scenario.staffReport || '店员上报快照待补';
+  }
+
+  function branchReportId(scenario, branch) {
+    if (branch.reportId) return branch.reportId;
+    const reportStage = branchStages(scenario, branch).report;
+    return reportStage ? (reportStage.facts.find(([label]) => label === '报告版本') || [])[1] || branch.instanceId : branch.instanceId;
+  }
+
+  function branchReportVersion(scenario, branch) {
+    return branch.reportVersion || '报价时快照';
+  }
+
+  function branchConclusion(scenario, branch) {
+    const quote = branchQuote(scenario, branch);
+    const downstream = branchDownstream(scenario, branch);
+    const buyerRows = branchBuyerRows(scenario, branch);
+    const partialUnquoted = buyerRows.filter((item) => item.status === 'unquoted').length;
+    if (branch.amountValue == null || quote.amountRaw == null) {
+      return { key: 'unquoted', label: '未报价', detail: '已定位阻断点', tone: 'danger' };
+    }
+    if (scenario.filter === 'incomplete' || branch.completenessPct < 70) {
+      return { key: 'incomplete', label: '待补证', detail: '上游证据缺失', tone: 'neutral' };
+    }
+    if (branch.badgeTone === 'danger' || quote.statusTone === 'danger') {
+      return { key: 'unsupported', label: '不支持', detail: partialUnquoted ? `规则链差异 · ${partialUnquoted} 个买家未报` : '规则链存在差异', tone: 'danger' };
+    }
+    if (downstream.afterSale || scenario.filter === 'aftersales') {
+      return { key: 'supported', label: '支持', detail: partialUnquoted ? `报价可解释 · ${partialUnquoted} 个买家未报 · 售后差异` : '报价可解释 · 售后差异', tone: 'warning' };
+    }
+    return { key: 'supported', label: '支持', detail: partialUnquoted ? `报价可解释 · ${partialUnquoted} 个买家未报` : '报价链完整解释', tone: 'success' };
+  }
+
+  function branchBuyerRows(scenario, branch) {
+    if (Array.isArray(branch.buyerQuotes) && branch.buyerQuotes.length) return branch.buyerQuotes;
+    const audience = branchAudience(scenario, branch);
+    const quote = branchQuote(scenario, branch);
+    const hitRule = (quote.rules || []).find((rule) => rule.hit);
+    const priceTier = (quote.lines || []).find((line) => line.kind === 'base');
+    const quotedBuyer = String(branch.buyer || '').replace(/^合作买家\s*/, '');
+    if (branch.amountValue == null) {
+      const reasonItem = (quote.difference && quote.difference.items || []).find(([label]) => /订单级原因|首个阻断点/.test(label));
+      const reason = reasonItem ? reasonItem[1] : branch.unquotedReason || '未报价原因已记录，详情待补';
+      return audience.buyers.map((buyer, index) => ({
+        buyer, status: 'unquoted', amount: '—', rule: '—', priceTier: '—',
+        reason: index === 0 ? reason : '同一策略买家组内未生成报价'
+      }));
+    }
+    return audience.buyers.map((buyer) => {
+      const isQuoted = buyer === quotedBuyer || audience.buyers.length === 1;
+      return {
+        buyer,
+        status: isQuoted ? 'quoted' : 'not-included',
+        amount: isQuoted ? branch.amount || quote.amount : '—',
+        rule: isQuoted ? hitRule ? `${hitRule.id} · 优先级 ${hitRule.priority}` : '规则快照待补' : '—',
+        priceTier: isQuoted ? priceTier ? priceTier.label : '实际取用价档待补' : '—',
+        reason: isQuoted ? quote.statusLabel || '已生成实际报价' : '未进入本次报价的买家级结果'
+      };
+    });
+  }
+
+  function allReportRows() {
+    const ordered = scenarios.slice().sort((a, b) => {
+      const ai = queueOrder.indexOf(a.id);
+      const bi = queueOrder.indexOf(b.id);
+      return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+    });
+    return ordered.flatMap((scenario) => {
+      const branches = branchesOf(scenario);
+      return branches.map((branch, index) => ({
+        scenario,
+        branch,
+        branchIndex: index + 1,
+        branchCount: branches.length,
+        conclusion: branchConclusion(scenario, branch)
+      }));
+    });
+  }
+
+  function reportRowSearchText(row) {
+    const { scenario, branch } = row;
+    const model = branchModel(scenario, branch);
+    const audience = branchAudience(scenario, branch);
+    const candidates = branchCandidates(scenario, branch);
+    const mappings = branchData(scenario, branch, 'mappings') || [];
+    const buyerRows = branchBuyerRows(scenario, branch);
+    return [
+      scenario.orderNo, scenario.device, scenario.specs, scenario.store, scenario.channel, scenario.traceId,
+      branch.label, branch.instanceId, branchReportId(scenario, branch), branchReportVersion(scenario, branch),
+      branch.reportGrade, (branch.issues || []).join(' '),
+      branchStrategy(scenario, branch).id, branchStrategy(scenario, branch).name, branchStrategy(scenario, branch).version,
+      audience.buyers.join(' '), model.code, model.run, model.threshold,
+      candidates.map((item) => item.label).join(' '),
+      mappings.map((item) => `${item.source} ${item.type} ${item.option}`).join(' '),
+      buyerRows.map((item) => `${item.buyer} ${item.amount} ${item.rule} ${item.reason}`).join(' ')
+    ].join(' ').toLowerCase();
+  }
+
+  function visibleReportRows() {
+    let rows = allReportRows();
+    if (state.filter === 'dual') rows = rows.filter((row) => row.branchCount > 1 || row.scenario.filter === 'dual');
+    else if (state.filter === 'unquoted') rows = rows.filter((row) => row.conclusion.key === 'unquoted');
+    else if (state.filter === 'anomaly') rows = rows.filter((row) => row.conclusion.key === 'unsupported');
+    else if (state.filter === 'incomplete') rows = rows.filter((row) => row.conclusion.key === 'incomplete');
+    else if (state.filter === 'consistent') rows = rows.filter((row) => row.conclusion.key === 'supported');
+    else if (state.filter === 'aftersales') rows = rows.filter((row) => Boolean(branchDownstream(row.scenario, row.branch).afterSale));
+
+    if (state.ledgerModel !== 'all') rows = rows.filter((row) => branchModel(row.scenario, row.branch).code === state.ledgerModel);
+    if (state.ledgerAftersale !== 'all') {
+      rows = rows.filter((row) => {
+        const hasAfterSale = Boolean(branchDownstream(row.scenario, row.branch).afterSale);
+        return state.ledgerAftersale === 'yes' ? hasAfterSale : !hasAfterSale;
+      });
+    }
+    const query = state.queueQuery.trim().toLowerCase();
+    if (query) rows = rows.filter((row) => reportRowSearchText(row).includes(query));
+    return rows;
+  }
+
   function isSharedStage(scenario, key) {
     return Boolean(scenario.sharedStages && scenario.sharedStages[key]);
-  }
-
-  function branchSearchText(scenario) {
-    return branchesOf(scenario).map((branch) => [
-      branch.label, branch.instanceId, branch.reportGrade, (branch.issues || []).join(' '),
-      branch.strategy && branch.strategy.name, branch.strategy && branch.strategy.id,
-      branch.buyer, branch.amount, branch.audience && (branch.audience.buyers || []).join(' '),
-      branch.model && branch.model.run, branch.model && branch.model.code
-    ].join(' ')).join(' ');
-  }
-
-  function visibleScenarios() {
-    const base = state.filter === 'all' ? scenarios.slice().sort((a, b) => queueOrder.indexOf(a.id) - queueOrder.indexOf(b.id)) : scenarios.filter((item) => item.filter === state.filter);
-    const query = state.queueQuery.trim().toLowerCase();
-    if (!query) return base;
-    return base.filter((item) => [item.orderNo, item.device, item.specs, item.traceId, item.reportGrade, item.queueType, (item.issues || []).join(' '), branchSearchText(item)].join(' ').toLowerCase().includes(query));
   }
 
   function renderQueue() {
     const body = $('#queueBody');
     if (!body) return;
-    const rows = visibleScenarios();
-    $('#queueSubtitle').textContent = state.filter === 'all'
-      ? '演示数据 · 6 个典型案例，按排查优先级排列'
-      : `演示数据 · ${filterLabels[state.filter] || '当前筛选'} · ${rows.length} 个案例`;
+    const allRows = allReportRows();
+    const rows = visibleReportRows();
+    const counts = {
+      all: allRows.length,
+      consistent: allRows.filter((row) => row.conclusion.key === 'supported').length,
+      anomaly: allRows.filter((row) => row.conclusion.key === 'unsupported').length,
+      unquoted: allRows.filter((row) => row.conclusion.key === 'unquoted').length,
+      incomplete: allRows.filter((row) => row.conclusion.key === 'incomplete').length,
+      aftersales: allRows.filter((row) => Boolean(branchDownstream(row.scenario, row.branch).afterSale)).length,
+      dual: allRows.filter((row) => row.branchCount > 1 || row.scenario.filter === 'dual').length
+    };
+    const filtersActive = state.ledgerModel !== 'all' || state.ledgerAftersale !== 'all' || Boolean(state.queueQuery.trim());
+    $('#queueSubtitle').textContent = filtersActive
+      ? `报告级台账 · 当前筛选 ${rows.length} / ${allRows.length} 份报告`
+      : `报告级台账 · 一行一份 AI 报告实例 · 共 ${allRows.length} 份报告`;
 
     if (!rows.length) {
-      body.innerHTML = `<tr class="empty-row"><td colspan="7"><div class="empty-state">${ic('search')}<strong>没有匹配的订单</strong><span>尝试清空筛选或更换关键词</span></div></td></tr>`;
+      body.innerHTML = `<tr class="empty-row"><td colspan="7"><div class="empty-state">${ic('search')}<strong>没有匹配的报告</strong><span>尝试清空筛选、模型 code 或关键词</span></div></td></tr>`;
     } else {
-      body.innerHTML = rows.map((item) => {
-        const branches = branchesOf(item);
-        const issueText = branches.length > 1
-          ? branches.map((branch) => `${branch.label} ${branch.reportGrade}`).join(' · ')
-          : (item.issues.length ? item.issues.join(' · ') : '报告项待核');
-        const reportMeta = branches.length > 1
-          ? `${branches.length} 份报告 · 各自独立快照`
-          : (item.issues.length ? `${item.issues.length} 个问题项` : '来源待核');
-        const reportPill = branches.length > 1 ? `${branches.length} 份报告` : item.reportGrade;
-        const amountClass = item.amountValue == null ? 'amount-cell empty' : 'amount-cell';
-        const amountHtml = item.amountLines
-          ? `<span class="amount-stack">${item.amountLines.map((line) => `<span><b>${esc(line.label)}</b>${esc(line.value)}</span>`).join('')}<small>分支报价 · 不合并</small></span>`
-          : `<span class="${amountClass}">${esc(item.amount)}${item.amountValue == null ? '' : '<small>唯一报价结果</small>'}</span>`;
-        return `<tr tabindex="0" role="button" data-scenario="${esc(item.id)}" aria-label="查看 ${esc(item.orderNo)} 追溯详情">
-          <td><div class="cell-order"><strong>${esc(item.orderNo)}</strong><span>${esc(item.device)} · ${esc(item.specs)}</span><span class="cell-sub">${esc(item.store)} · 今日 ${esc(item.time)}</span></div></td>
-          <td><span>${esc(item.queueType)}</span><span class="cell-sub">${esc(issueText)}</span></td>
-          <td><span class="status-pill neutral no-dot">${esc(reportPill)}</span><span class="cell-sub">${esc(reportMeta)}</span></td>
-          <td>${amountHtml}</td>
-          <td><span class="status-pill ${esc(item.badgeTone)}">${esc(item.badge)}</span></td>
-          <td><span>${esc(item.time)}</span><span class="cell-sub">${esc(item.completenessText)}</span></td>
-          <td><button class="row-action" type="button" tabindex="-1" aria-label="进入详情">${ic('chevronRight')}</button></td>
+      body.innerHTML = rows.map((row) => {
+        const { scenario, branch, branchIndex, branchCount, conclusion } = row;
+        const model = branchModel(scenario, branch);
+        const strategy = branchStrategy(scenario, branch);
+        const audience = branchAudience(scenario, branch);
+        const candidates = branchCandidates(scenario, branch);
+        const mappings = branchData(scenario, branch, 'mappings') || [];
+        const buyerRows = branchBuyerRows(scenario, branch);
+        const downstream = branchDownstream(scenario, branch);
+        const selected = branch.selectedLabels || candidates.filter((item) => item.accepted).map((item) => item.label);
+        const topLabels = selected.slice(0, 2);
+        const quote = branchQuote(scenario, branch);
+        const quotedCount = buyerRows.filter((item) => item.status === 'quoted').length;
+        const unquotedCount = buyerRows.filter((item) => item.status === 'unquoted').length;
+        const mappingCount = mappings.filter((item) => !item.filtered).length;
+        const afterSale = downstream.afterSale;
+        const deal = (downstream.summary || []).find((item) => /中标买家|成交买家|成交/.test(item.label));
+        const dealText = afterSale
+          ? `${afterSale.id || '售后'} · ${afterSale.status || '处理中'}`
+          : deal && deal.value === '待同步' ? '成交买家待同步'
+            : deal ? `${deal.label} ${deal.value}` : '成交/售后待关联';
+        const threshold = String(model.threshold || '阈值待补').split('·')[0].trim();
+        return `<tr class="ledger-row${branchCount > 1 ? ' multi-report' : ''}" tabindex="0" role="button" data-report-key="${esc(scenario.id)}:${esc(branch.id)}" data-scenario-id="${esc(scenario.id)}" data-branch-id="${esc(branch.id)}" aria-label="查看 ${esc(scenario.orderNo)} ${esc(branch.label)} 的报告追溯详情">
+          <td class="ledger-order-cell" data-label="订单 / 设备">
+            <div class="ledger-order-head"><strong>${esc(scenario.orderNo)}</strong><span class="order-report-ratio">${branchCount > 1 ? `报告 ${branchIndex}/${branchCount}` : '单报告'}</span></div>
+            <span>${esc(scenario.device)} · ${esc(scenario.specs)}</span>
+            <small>${esc(scenario.store)} · ${esc(scenario.time)} · ${esc(scenario.channel)}</small>
+          </td>
+          <td data-label="报告实例 / 成色">
+            <div class="ledger-report-identity"><div><span class="report-branch-label">${esc(branch.label)}</span><strong>${esc(branch.instanceId)}</strong></div><small>${esc(branchReportId(scenario, branch))} · ${esc(branchReportVersion(scenario, branch))}</small><span class="report-grade-chip">${esc(branch.reportGrade)} · ${branch.issues.length} 项</span></div>
+          </td>
+          <td data-label="买家策略 / 买家组">
+            <div class="ledger-stack"><strong>${esc(strategy.id)} · ${esc(strategy.version)}</strong><span>${esc(strategy.name)}</span><small>${esc(audience.buyers.join(' / ') || '买家待补')} · ${audience.buyers.length} 个买家</small></div>
+          </td>
+          <td data-label="模型任务 / 图片 / 标签">
+            <div class="ledger-stack"><strong>${esc(model.code || '模型待补')} · ${esc(model.run || '任务待补')}</strong><span>${branchImages(scenario, branch).length} 图 · ${candidates.length} 候选 · 阈值 ${esc(threshold)}</span><div class="ledger-tag-row">${topLabels.map((label) => `<i>${esc(label)}</i>`).join('') || '<i>标签待补</i>'}</div></div>
+          </td>
+          <td data-label="AI 报告 / 店员上报">
+            <div class="ledger-stack"><strong>${esc(topLabels.join(' + ') || branch.issues.join(' + ') || '报告项待核')}</strong><span>${esc(branch.reportGrade)} · 映射 ${mappingCount} 条</span><small>${esc(branchStaffReport(scenario, branch))}</small></div>
+          </td>
+          <td data-label="实际报价 / 买家状态">
+            <div class="ledger-quote ${branch.amountValue == null ? 'empty' : ''}"><strong>${branch.amountValue == null ? '未报价' : esc(branch.amount)}</strong><span>${quotedCount} 已报 / ${unquotedCount} 未报</span><small>${branch.amountValue == null ? esc(buyerRows[0] ? buyerRows[0].reason : '未报价原因待补') : esc(quote.attempt || '实际报价')}</small></div>
+          </td>
+          <td data-label="判定 / 成交售后">
+            <div class="ledger-conclusion"><span class="status-pill ${esc(conclusion.tone)}">${esc(conclusion.label)}</span><span>${esc(conclusion.detail)}</span><small>${esc(dealText)}</small></div>
+            <span class="ledger-row-action" aria-hidden="true">${ic('chevronRight')}</span>
+          </td>
         </tr>`;
       }).join('');
     }
+
+    $$('[data-filter-count]').forEach((node) => { node.textContent = String(counts[node.dataset.filterCount] || 0); });
+    $$('[data-side-count]').forEach((node) => { node.textContent = String(counts[node.dataset.sideCount] || 0); });
+    $('#metricReports').textContent = String(counts.all);
+    $('#metricOrders').textContent = String(new Set(allRows.map((row) => row.scenario.id)).size);
+    $('#metricUnquoted').textContent = String(counts.unquoted);
+    $('#metricAnomaly').textContent = String(counts.anomaly);
+    $('#metricAfterSales').textContent = String(counts.aftersales);
+    $('#outcomeSupported').textContent = String(counts.consistent);
+    $('#outcomeUnsupported').textContent = String(counts.anomaly);
+    $('#outcomePending').textContent = String(counts.unquoted + counts.incomplete);
 
     $$('#queueFilters [data-queue-filter]').forEach((button) => {
       const active = button.dataset.queueFilter === state.filter;
@@ -181,14 +367,14 @@
     if (!queueBound) {
       queueBound = true;
       $('#queueBody').addEventListener('click', (event) => {
-        const row = event.target.closest('[data-scenario]');
-        if (row) navigateToScenario(row.dataset.scenario);
+        const row = event.target.closest('[data-report-key]');
+        if (row) navigateToReport(row.dataset.scenarioId, row.dataset.branchId);
       });
       $('#queueBody').addEventListener('keydown', (event) => {
-        const row = event.target.closest('[data-scenario]');
+        const row = event.target.closest('[data-report-key]');
         if (row && (event.key === 'Enter' || event.key === ' ')) {
           event.preventDefault();
-          navigateToScenario(row.dataset.scenario);
+          navigateToReport(row.dataset.scenarioId, row.dataset.branchId);
         }
       });
     }
@@ -196,21 +382,30 @@
 
   function renderOverview() {
     renderQueue();
-    const active = state.filter === 'all' ? '全部待排查订单' : filterLabels[state.filter] || '待排查订单';
+    const active = state.filter === 'all' ? '全部报告实例' : filterLabels[state.filter] || '当前筛选';
     const subtitle = state.filter === 'all'
-      ? '先定位订单下的报告分支，再查看该分支标签选择、报告与实际报价的形成过程。'
-      : `当前查看：${active}。筛选只改变工作台列表，不改变追溯事实。`;
+      ? '一行对应一份 AI 报告实例；同一订单的多份报告分组保留，分别查看策略归属、模型标签、报告成色和买家报价。'
+      : `当前查看：${active}。筛选只改变报告台账，不合并或改写任何报告分支事实。`;
     $('.page-heading .heading-desc').textContent = subtitle;
   }
 
-  function navigateToScenario(id) {
+  function navigateToScenario(id, branchId) {
     if (!getScenario(id)) return;
-    const target = `#trace/${id}`;
+    const target = branchId ? `#trace/${encodeURIComponent(id)}/${encodeURIComponent(branchId)}` : `#trace/${encodeURIComponent(id)}`;
     if (window.location.hash !== target) {
       window.location.hash = target;
     } else {
-      showScenario(id);
+      showScenario(id, branchId);
     }
+  }
+
+  function navigateToReport(scenarioId, branchId) {
+    const scenario = getScenario(scenarioId);
+    if (!scenario) return;
+    const branch = getBranch(scenario, branchId);
+    const target = `#report/${encodeURIComponent(scenario.id)}/${encodeURIComponent(branch.id)}`;
+    if (window.location.hash !== target) window.location.hash = target;
+    else openReportDrawer(scenario.id, branch.id);
   }
 
   function navigateOverview() {
@@ -218,11 +413,12 @@
     else showOverviewView();
   }
 
-  function showScenario(id) {
+  function showScenario(id, branchId) {
     const scenario = getScenario(id);
     if (!scenario) return;
+    closeReportDrawer(false);
     state.activeScenarioId = scenario.id;
-    state.activeBranchId = defaultBranchId(scenario);
+    state.activeBranchId = branchId && getBranch(scenario, branchId) ? getBranch(scenario, branchId).id : defaultBranchId(scenario);
     state.activeTab = 'chain';
     state.activeStage = 'report';
     renderDetail(scenario);
@@ -234,12 +430,156 @@
   }
 
   function showOverviewView() {
+    closeReportDrawer(false);
     $('#detailView').hidden = true;
     $('#overviewView').hidden = false;
     renderOverview();
     closeSidebar();
     window.scrollTo({ top: 0, behavior: 'auto' });
-    document.title = '报价追溯台 · AI 报告订单追溯链路';
+    document.title = 'AI 报告追溯台账 · AI 报告订单追溯链路';
+  }
+
+  function openReportDrawer(scenarioId, branchId) {
+    const scenario = getScenario(scenarioId);
+    if (!scenario) return;
+    const branch = getBranch(scenario, branchId);
+    const root = $('#reportDrawer');
+    const content = $('#drawerContent');
+    if (!state.drawerOpen) state.lastDrawerFocus = document.activeElement;
+    state.drawerKey = `${scenario.id}:${branch.id}`;
+    state.drawerOpen = true;
+    content.innerHTML = renderReportDrawer(scenario, branch);
+    $('#drawerBackdrop').hidden = false;
+    root.hidden = false;
+    document.body.classList.add('drawer-open');
+    window.hydrateIcons(content);
+    const scroll = $('.drawer-scroll', content);
+    if (scroll) scroll.scrollTop = 0;
+    document.title = `${scenario.orderNo} · ${branch.label} · 报告追溯`;
+    window.requestAnimationFrame(() => {
+      const close = $('[data-close-drawer]', content);
+      if (close) close.focus({ preventScroll: true });
+    });
+  }
+
+  function closeReportDrawer(updateHash) {
+    const root = $('#reportDrawer');
+    if (!root || !state.drawerOpen) return;
+    root.hidden = true;
+    $('#drawerBackdrop').hidden = true;
+    $('#drawerContent').innerHTML = '';
+    state.drawerOpen = false;
+    state.drawerKey = null;
+    document.body.classList.remove('drawer-open');
+    if (!state.modalOpen) document.body.style.overflow = '';
+    if (state.lastDrawerFocus && typeof state.lastDrawerFocus.focus === 'function') state.lastDrawerFocus.focus({ preventScroll: true });
+    state.lastDrawerFocus = null;
+    if (updateHash && window.location.hash.startsWith('#report/')) window.location.hash = 'overview';
+    else if (window.location.hash === '#overview' || window.location.hash === '') document.title = 'AI 报告追溯台账 · AI 报告订单追溯链路';
+  }
+
+  function renderReportDrawer(scenario, branch) {
+    const branches = branchesOf(scenario);
+    const model = branchModel(scenario, branch);
+    const strategy = branchStrategy(scenario, branch);
+    const audience = branchAudience(scenario, branch);
+    const candidates = branchCandidates(scenario, branch);
+    const mappings = branchData(scenario, branch, 'mappings') || [];
+    const buyerRows = branchBuyerRows(scenario, branch);
+    const downstream = branchDownstream(scenario, branch);
+    const quote = branchQuote(scenario, branch);
+    const conclusion = branchConclusion(scenario, branch);
+    const selected = branch.selectedLabels || candidates.filter((item) => item.accepted).map((item) => item.label);
+    const accepted = candidates.filter((item) => item.accepted).length;
+    const afterSale = downstream.afterSale;
+    const recheck = (downstream.summary || []).find((item) => /复检/.test(item.label));
+    const reportVersionText = `${branchReportId(scenario, branch)} · ${branchReportVersion(scenario, branch)}`;
+    const siblings = branches.filter((item) => item.id !== branch.id);
+    const candidateRows = candidates.length ? candidates.map((candidate) => {
+      const mapping = mappings.find((item) => item.source === candidate.label);
+      const isSelected = selected.includes(candidate.label);
+      const decision = !candidate.accepted ? candidate.reason : isSelected ? '策略采用' : '策略未选取';
+      return `<tr class="${candidate.accepted ? '' : 'filtered'}">
+        <td><strong>${esc(candidate.label)}</strong><small>${esc(candidate.type)}</small></td>
+        <td><span class="candidate-confidence">${esc(candidate.confidence.toFixed(2))}</span></td>
+        <td>≥ ${esc(candidate.threshold.toFixed(2))}</td>
+        <td><span class="accept-state${isSelected ? '' : ' filtered'}">${ic(isSelected ? 'circleCheck' : 'minus')}${esc(decision)}</span></td>
+        <td>${mapping ? `<strong>${esc(mapping.option)}</strong><small>${esc(mapping.severity)} · ${esc(mapping.report)}</small>` : '<span class="muted-text">未映射 / 未进入报告</span>'}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="5"><div class="drawer-missing">${ic('fileWarning')}<span>候选标签与映射快照缺失，无法用当前配置补造历史路径。</span></div></td></tr>`;
+    const buyerRowsHtml = buyerRows.map((row) => {
+      const statusLabel = row.status === 'quoted' ? '已报价' : row.status === 'unquoted' ? '未报价' : '未进入本次报价';
+      const tone = row.status === 'quoted' ? 'success' : row.status === 'unquoted' ? 'danger' : 'neutral';
+      return `<tr><td><strong>${esc(row.buyer)}</strong><small>${esc(audience.label)}</small></td><td><span class="status-pill ${tone} no-dot">${statusLabel}</span></td><td class="buyer-amount">${esc(row.amount)}</td><td><strong>${esc(row.rule)}</strong><small>${esc(row.priceTier)}</small></td><td>${esc(row.reason)}</td></tr>`;
+    }).join('');
+    const downstreamCards = (downstream.summary || []).map((item) => `<div><span>${esc(item.label)}</span><strong>${esc(item.value)}</strong><small>${esc(item.note)}</small></div>`).join('');
+    const siblingHtml = branches.length > 1 ? `<div class="drawer-siblings"><div>${ic('gitBranch')}<span><strong>本订单共 ${branches.length} 份报告</strong><small>当前只查看 ${esc(branch.label)}；切换仅改变分支，不合并报告结论。</small></span></div><div class="drawer-sibling-actions">${siblings.map((item) => `<button class="button small" type="button" data-sibling-report="${esc(scenario.id)}:${esc(item.id)}">查看 ${esc(item.label)}</button>`).join('')}</div></div>` : '';
+
+    return `<div class="drawer-head">
+      <div class="drawer-title-wrap"><p>AI report trace · 单报告只读快照</p><h2 id="drawerTitle">${esc(scenario.device)} · ${esc(scenario.specs)}</h2><span>${esc(scenario.orderNo)} · ${esc(scenario.store)} · ${esc(scenario.time)} · trace_id ${esc(scenario.traceId)}</span></div>
+      <div class="drawer-head-actions"><button class="button small" type="button" data-copy-report>${ic('copy')}复制摘要</button><button class="button primary small" type="button" data-full-trace="${esc(scenario.id)}:${esc(branch.id)}">${ic('external')}打开完整链路</button><button class="drawer-close" type="button" data-close-drawer aria-label="关闭报告详情">${ic('x')}</button></div>
+    </div>
+    <div class="drawer-scroll">
+      <div class="drawer-report-banner">
+        <div class="drawer-report-badge"><span>${esc(branch.label)}</span><strong>${esc(branch.instanceId)}</strong><small>${esc(reportVersionText)}</small></div>
+        <div class="drawer-report-meta"><span>${esc(strategy.id)} · ${esc(strategy.name)} ${esc(strategy.version)}</span><span>${esc(audience.buyers.join(' / '))} · ${audience.buyers.length} 个买家</span><span>${esc(model.code || '模型待补')} · ${esc(model.run || '任务待补')}</span></div>
+        <span class="status-pill ${esc(conclusion.tone)}">${esc(conclusion.label)} · ${esc(conclusion.detail)}</span>
+      </div>
+      ${siblingHtml}
+      <div class="drawer-verdict ${esc(branch.verdict.tone)}"><span class="drawer-verdict-icon">${ic(branch.verdict.icon)}</span><div><span class="status-pill ${esc(branch.badgeTone)} no-dot">${esc(branch.verdict.label)}</span><h3>${esc(branch.verdict.title)}</h3><p>${esc(branch.verdict.description)}</p></div><span class="drawer-completeness">${esc(branch.completenessText)}<b>${esc(branch.completenessPct)}%</b></span></div>
+      <div class="drawer-metrics"><div><span>报告成色</span><strong>${esc(branch.reportGrade)}</strong><small>${branch.issues.length} 个问题项</small></div><div><span>实际报价</span><strong>${branch.amountValue == null ? '未报价' : esc(branch.amount)}</strong><small>${branch.amountValue == null ? '不生成推测金额' : '买家实际报价'}</small></div><div><span>策略买家组</span><strong>${audience.buyers.length} 个</strong><small>${esc(audience.buyers.join(' / '))}</small></div><div><span>下游</span><strong>${afterSale ? esc(afterSale.status) : downstream.summary && downstream.summary.length ? '已关联' : '待关联'}</strong><small>${afterSale ? esc(afterSale.id) : '成交与售后摘要'}</small></div></div>
+
+      <section class="drawer-section">
+        <header><div><h3>报告身份与数据来源</h3><p>以报告实例为锚点，不从当前配置反推历史。</p></div><span class="status-pill neutral no-dot">只读</span></header>
+        <div class="drawer-identity-grid">
+          <div><span>报告实例</span><strong>${esc(branch.instanceId)}</strong><small>分支锚点</small></div>
+          <div><span>报告 ID / 版本</span><strong>${esc(reportVersionText)}</strong><small>报告不可人工修改</small></div>
+          <div><span>买家策略</span><strong>${esc(strategy.id)} · ${esc(strategy.version)}</strong><small>${esc(strategy.name)}</small></div>
+          <div><span>策略买家组</span><strong>${esc(audience.buyers.join(' / ') || '待补')}</strong><small>报告生成前归属</small></div>
+          <div><span>模型任务</span><strong>${esc(model.code || '待补')} · ${esc(model.run || '待补')}</strong><small>${esc(model.version || '版本待补')}</small></div>
+          <div><span>输入快照</span><strong>${esc(model.input || '输入待补')}</strong><small>${esc(model.quality || '质量结果待补')}</small></div>
+          <div><span>报价尝试</span><strong>${esc(quote.attempt || '尚未生成')}</strong><small>${esc(quote.buyer || branch.buyer || '买家待补')}</small></div>
+          <div><span>证据完整度</span><strong>${esc(branch.completenessPct)}%</strong><small>${esc(branch.completenessText)}</small></div>
+        </div>
+      </section>
+
+      <section class="drawer-section">
+        <header><div><h3>向前追溯 · 模型与标签证据</h3><p>模型任务、图片、候选标签和阈值按本报告独立保存。</p></div><span class="status-pill info no-dot">${branchImages(scenario, branch).length} 图 / ${candidates.length} 候选</span></header>
+        <div class="drawer-evidence-chain">
+          <article><span class="drawer-step-number">01</span><strong>图片输入</strong><p>${esc(model.input || '输入快照待补')}</p><small>${branchImages(scenario, branch).length} 张图片 · ${esc(model.quality || '质量待核')}</small></article>
+          <span class="drawer-step-arrow">${ic('chevronRight')}</span>
+          <article><span class="drawer-step-number">02</span><strong>候选标签</strong><p>${candidates.length} 个候选，${accepted} 个超过阈值</p><small>阈值 ${esc(model.threshold || '待补')}</small></article>
+          <span class="drawer-step-arrow">${ic('chevronRight')}</span>
+          <article><span class="drawer-step-number">03</span><strong>策略选择</strong><p>${esc(selected.join(' · ') || '策略未选取标签')}</p><small>${esc(strategy.id)} · ${esc(strategy.version)}</small></article>
+          <span class="drawer-step-arrow">${ic('chevronRight')}</span>
+          <article class="anchor"><span class="drawer-step-number">04</span><strong>${esc(branch.reportGrade)} · AI 报告</strong><p>${esc(branch.issues.join(' · ') || '报告项待核')}</p><small>${esc(branch.instanceId)}</small></article>
+        </div>
+        <div class="drawer-table-wrap"><table class="drawer-table"><thead><tr><th>原始候选标签</th><th>置信度</th><th>阈值</th><th>策略决策</th><th>最终映射 / 报告项</th></tr></thead><tbody>${candidateRows}</tbody></table></div>
+      </section>
+
+      <section class="drawer-section">
+        <header><div><h3>三方对照 · AI / 店员 / 复检</h3><p>对照只针对当前报告实例，不混入同订单其他报告。</p></div><span class="status-pill neutral no-dot">差异摘要</span></header>
+        <div class="drawer-compare-grid">
+          <article><span>AI 报告</span><strong>${esc(branch.reportGrade)} · ${esc(branch.issues.join(' / ') || '报告项待核')}</strong><p>${esc(selected.join(' + ') || '采用标签待补')}</p></article>
+          <article><span>店员上报</span><strong>${esc(branchStaffReport(scenario, branch))}</strong><p>用于解释 AI 与人工上报的差异，不覆盖原始上报。</p></article>
+          <article><span>成交后复检</span><strong>${afterSale ? esc(afterSale.issue) : recheck ? `${esc(recheck.value)} · ${esc(recheck.note)}` : '未关联复检差异'}</strong><p>${afterSale ? `${esc(afterSale.id)} · ${esc(afterSale.status)}` : '无售后时保留“无差异/未发生”，不推断责任。'}</p></article>
+        </div>
+      </section>
+
+      <section class="drawer-section">
+        <header><div><h3>向后追溯 · 报价买家矩阵</h3><p>每个买家只保留实际报价；未报价买家保留订单级原因及本报告归属。</p></div><span class="status-pill ${esc(quote.statusTone || 'neutral')} no-dot">${esc(quote.statusLabel || '报价快照')}</span></header>
+        <div class="drawer-table-wrap"><table class="drawer-table buyer-table"><thead><tr><th>买家</th><th>状态</th><th>实际报价</th><th>命中规则 / 实际取用价档</th><th>说明</th></tr></thead><tbody>${buyerRowsHtml || '<tr><td colspan="5">买家报价记录待补</td></tr>'}</tbody></table></div>
+        <div class="drawer-note">${ic('info')}<span>不展示应得报价、成本价、市场价、规则重算价或跨成色档基准；每份报告、每个买家只展示买家实际报价。</span></div>
+      </section>
+
+      <section class="drawer-section">
+        <header><div><h3>成交与售后归属</h3><p>成交买家确定后，按“成交买家 → 独立策略 → 报告实例”自动归属。</p></div>${afterSale ? `<span class="status-pill warning no-dot">${esc(afterSale.status)}</span>` : '<span class="status-pill neutral no-dot">待成交/无售后</span>'}</header>
+        <div class="drawer-downstream">${downstreamCards || '<div><span>链路状态</span><strong>待补</strong><small>暂无下游事件</small></div>'}</div>
+        ${afterSale ? `<div class="drawer-after-sale">${ic('alertCircle')}<div><strong>${esc(afterSale.id)} · ${esc(afterSale.issue)}</strong><p>${esc(afterSale.impact)} · 负责人 ${esc(afterSale.owner)}</p></div></div>` : ''}
+        <div class="drawer-note">${ic('shield')}<span>报告、报价、成交归属和售后关联均为只读快照；售后差异不会反向改写成交前的 AI 报告。</span></div>
+      </section>
+      <div class="drawer-footer"><span>REQ-20261021-001 · v1.3 · ${esc(branch.instanceId)}</span><button class="button primary small" type="button" data-full-trace="${esc(scenario.id)}:${esc(branch.id)}">${ic('external')}查看完整全链路</button></div>
+    </div>`;
   }
 
   function renderDetail(scenario) {
@@ -584,7 +924,7 @@
   }
 
   function openHelpModal() {
-    openModal(`<div class="modal-head"><div><h2 id="modalTitle">P0 判定说明</h2><p>先定位报告分支，再解释该分支内的报告与报价；系统不评价跨报告的绝对高低</p></div><button class="modal-close" type="button" data-close-modal aria-label="关闭">${ic('x')}</button></div><div class="modal-body"><div class="p1-banner">${ic('info')}<div><strong>一单多报告，分支并行保留</strong><p>每个买家独立配置策略，策略在报告生成前决定哪些买家使用该报告。同一订单可以按不同买家组并行派生多份报告，全部保留、不覆盖、不合并；各报告可拥有独立模型任务、输入、候选标签和阈值。</p></div></div><div class="scope-compare"><article><h3>规则执行一致</h3><p>当前报告分支的实际报价能够由该分支报告条件、命中的价格规则、实际取用价档和计价明细完整解释。成色与专项扣减项命中后跨档取价属于合法业务。</p></article><article><h3>规则链差异</h3><p>当前报告分支的实际报价与规则条件、优先级、实际价档或计价明细不一致。其他分支报价正常，不能抵消这个差异。</p></article><article><h3>证据不足</h3><p>缺少关键快照时只展示已知事实和缺口，降级为待确认线索，不生成确定性原因、责任或高低价结论。</p></article></div><div class="quote-notes">${ic('alertCircle')}<span><strong>不使用：</strong>其他报告分支金额、其他买家报价、历史成交、市场价、成本价或不同成色档的绝对价格作为自动高低基准。成交买家同步后按其独立策略自动归属报告。</span></div></div>`);
+    openModal(`<div class="modal-head"><div><h2 id="modalTitle">P0 追溯口径</h2><p>先锁定报告实例，再解释当前报告内的规则、买家报价与证据；系统不评价跨报告的绝对高低</p></div><button class="modal-close" type="button" data-close-modal aria-label="关闭">${ic('x')}</button></div><div class="modal-body"><div class="p1-banner">${ic('info')}<div><strong>一行一份报告，同单多报告并行保留</strong><p>报告台账按报告实例展示，不按订单合并。每个买家独立配置策略，策略在报告生成前决定哪些买家使用该报告；同一策略可绑定多个买家，但每位买家的已报价/未报价结果分别保留。</p></div></div><div class="scope-compare"><article><h3>支持</h3><p>当前报告已经形成的实际报价，能够由报告条件、命中规则、实际取用价档和计价明细完整解释。成色与专项扣减项命中后跨档取价属于合法业务。报告行同时展示该策略买家组内是否有未报价买家。</p></article><article><h3>不支持</h3><p>当前报告的实际报价与规则条件、优先级、实际价档或计价明细不一致。其他报告分支报价正常，不能抵消这个差异。</p></article><article><h3>未报价 / 待补证</h3><p>报告没有任何有效报价时标为“未报价”；缺少关键快照、无法判断规则链时标为“待补证”。买家级未报价在详情买家矩阵展开，不等同于整份报告未报价。</p></article></div><div class="quote-notes">${ic('alertCircle')}<span><strong>价格边界：</strong>只展示买家实际报价，不使用其他报告分支金额、其他买家报价、历史成交、市场价、成本价、规则重算价或不同成色档的绝对价格作为自动高低基准。</span></div></div>`);
   }
 
   function openModal(contentHtml) {
@@ -606,7 +946,7 @@
     root.hidden = true;
     $('#modalContent').innerHTML = '';
     state.modalOpen = false;
-    document.body.style.overflow = '';
+    document.body.style.overflow = state.drawerOpen ? 'hidden' : '';
     if (state.lastFocus && typeof state.lastFocus.focus === 'function') state.lastFocus.focus({ preventScroll: true });
   }
 
@@ -656,31 +996,43 @@
   }
 
   function exportOverviewCsv() {
-    const rows = visibleScenarios();
+    const rows = visibleReportRows();
     if (!rows.length) {
-      showToast('当前筛选下没有可导出的订单', 'error');
+      showToast('当前筛选下没有可导出的报告', 'error');
       return;
     }
-    const header = ['订单号', '设备', '门店', '渠道', '买家策略归属', '报告分支', '分支成色 / 问题项', '独立模型任务', '分支实际报价', '链路判定', '证据完整度'];
-    const lines = rows.map((item) => {
-      const branches = branchesOf(item);
+    const header = ['订单号', '设备', '门店', '渠道', '报告实例', '报告 ID / 版本', '买家策略', '策略买家组', '模型任务', 'run_id', '报告成色 / 问题项', '已报价买家 / 实际报价', '未报价买家 / 原因', '成交与售后', '链路结论', '证据完整度'];
+    const lines = rows.map(({ scenario, branch, conclusion }) => {
+      const model = branchModel(scenario, branch);
+      const strategy = branchStrategy(scenario, branch);
+      const audience = branchAudience(scenario, branch);
+      const buyerRows = branchBuyerRows(scenario, branch);
+      const downstream = branchDownstream(scenario, branch);
+      const quoted = buyerRows.filter((row) => row.status === 'quoted').map((row) => `${row.buyer} ${row.amount}（${row.rule}）`).join(' / ');
+      const unquoted = buyerRows.filter((row) => row.status === 'unquoted').map((row) => `${row.buyer}（${row.reason}）`).join(' / ');
+      const afterSale = downstream.afterSale;
       return [
-        item.orderNo,
-        `${item.device} ${item.specs}`,
-        item.store,
-        item.channel,
-        branches.map((branch) => `${branch.audience && branch.audience.buyers ? branch.audience.buyers.join('、') : branch.buyer} → ${branch.strategy.id} ${branch.strategy.version}`).join(' / '),
-        branches.map((branch) => `${branch.label} ${branch.instanceId}`).join(' / '),
-        branches.map((branch) => `${branch.label} ${branch.reportGrade}：${(branch.issues || []).join('、')}`).join(' / '),
-        branches.map((branch) => `${branch.label} ${branchModel(item, branch).run || '待补'}`).join(' / '),
-        branches.map((branch) => `${branch.label} ${branch.amount}`).join(' / '),
-        branches.map((branch) => `${branch.label} ${branch.badge}`).join(' / '),
-        branches.map((branch) => `${branch.label} ${branch.completenessText}`).join(' / ')
+        scenario.orderNo,
+        `${scenario.device} ${scenario.specs}`,
+        scenario.store,
+        scenario.channel,
+        `${branch.label} ${branch.instanceId}`,
+        `${branchReportId(scenario, branch)} ${branchReportVersion(scenario, branch)}`,
+        `${strategy.id} ${strategy.version} · ${strategy.name}`,
+        audience.buyers.join(' / '),
+        model.code || '待补',
+        model.run || '待补',
+        `${branch.reportGrade}：${(branch.issues || []).join('、')}`,
+        quoted || '—',
+        unquoted || '—',
+        afterSale ? `${afterSale.id} · ${afterSale.status}` : '无售后/待关联',
+        `${conclusion.label} · ${conclusion.detail}`,
+        `${branch.completenessText} ${branch.completenessPct}%`
       ];
     });
     const csv = '\ufeff' + [header, ...lines].map((line) => line.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-    downloadFile('trace-queue-demo.csv', csv, 'text/csv;charset=utf-8');
-    showToast('已导出当前视图的脱敏演示数据');
+    downloadFile('ai-report-ledger-demo.csv', csv, 'text/csv;charset=utf-8');
+    showToast('已导出当前报告台账的脱敏演示数据');
   }
 
   function exportEvidenceJson() {
@@ -725,9 +1077,17 @@
   function copyCurrentSummary() {
     const scenario = getScenario(state.activeScenarioId);
     const branch = getBranch(scenario, state.activeBranchId);
+    copyReportSummary(scenario, branch);
+  }
+
+  function copyReportSummary(scenario, branch) {
     const model = branchModel(scenario, branch);
-    const buyers = branch.audience && branch.audience.buyers ? branch.audience.buyers.join('、') : branch.buyer;
-    const text = `【${scenario.orderNo}】${scenario.device} ${scenario.specs}\ntrace_id：${scenario.traceId}\n报告分支：${branch.label} · ${branch.instanceId}\n买家策略归属：${buyers} → ${branch.strategy.id} · ${branch.strategy.name} ${branch.strategy.version}\nAI 任务：${model.run || '待补'} · ${model.code || '—'} · ${model.input || '输入待补'}\nAI 报告：${branch.reportGrade} / ${branch.issues.join('、')}\n分支实际报价：${branch.amount}\n链路判定：${branch.badge}\n结论：${branch.verdict.title}\n${branch.verdict.description}`;
+    const strategy = branchStrategy(scenario, branch);
+    const audience = branchAudience(scenario, branch);
+    const buyerRows = branchBuyerRows(scenario, branch);
+    const buyerText = buyerRows.map((row) => `${row.buyer}：${row.status === 'quoted' ? row.amount : `未报价（${row.reason}）`}`).join('；');
+    const conclusion = branchConclusion(scenario, branch);
+    const text = `【${scenario.orderNo}】${scenario.device} ${scenario.specs}\ntrace_id：${scenario.traceId}\n报告实例：${branch.label} · ${branch.instanceId} · ${branchReportVersion(scenario, branch)}\n买家策略归属：${audience.buyers.join('、')} → ${strategy.id} · ${strategy.name} ${strategy.version}\nAI 任务：${model.run || '待补'} · ${model.code || '—'} · ${model.input || '输入待补'}\nAI 报告：${branch.reportGrade} / ${branch.issues.join('、')}\n报价买家：${buyerText || '待补'}\n结论：${conclusion.label} · ${conclusion.detail}\n${branch.verdict.title}`;
     copyText(text);
   }
 
@@ -753,9 +1113,20 @@
   function applyHash() {
     const raw = window.location.hash.replace(/^#/, '');
     if (raw.startsWith('trace/')) {
-      const id = decodeURIComponent(raw.slice(6));
+      const [idPart, branchPart] = raw.slice(6).split('/');
+      const id = decodeURIComponent(idPart);
+      const branchId = branchPart ? decodeURIComponent(branchPart) : null;
       if (scenarios.some((item) => item.id === id)) {
-        showScenario(id);
+        showScenario(id, branchId);
+        return;
+      }
+    }
+    if (raw.startsWith('report/')) {
+      const [idPart, branchPart] = raw.slice(7).split('/');
+      const id = decodeURIComponent(idPart || '');
+      const branchId = decodeURIComponent(branchPart || '');
+      if (scenarios.some((item) => item.id === id)) {
+        openReportDrawer(id, branchId || defaultBranchId(getScenario(id)));
         return;
       }
     }
@@ -792,13 +1163,23 @@
       renderQueue();
     });
 
+    $('#ledgerModel').addEventListener('change', (event) => {
+      state.ledgerModel = event.target.value;
+      renderQueue();
+    });
+
+    $('#ledgerAftersale').addEventListener('change', (event) => {
+      state.ledgerAftersale = event.target.value;
+      renderQueue();
+    });
+
     $('#globalSearch').addEventListener('keydown', (event) => {
       if (event.key !== 'Enter') return;
       event.preventDefault();
       const query = event.target.value.trim().toLowerCase();
       if (!query) return;
-      const found = scenarios.find((item) => [item.orderNo, item.device, item.specs, item.traceId, item.reportGrade, (item.issues || []).join(' '), branchSearchText(item)].join(' ').toLowerCase().includes(query));
-      if (found) navigateToScenario(found.id);
+      const found = allReportRows().find((row) => reportRowSearchText(row).includes(query));
+      if (found) navigateToReport(found.scenario.id, found.branch.id);
       else showToast('未找到匹配的演示订单，试试订单号、设备或 trace_id', 'error');
     });
 
@@ -874,6 +1255,33 @@
     });
     $('#sidebarOverlay').addEventListener('click', closeSidebar);
 
+    $('#drawerBackdrop').addEventListener('click', () => closeReportDrawer(true));
+    $('#drawerContent').addEventListener('click', (event) => {
+      if (event.target.closest('[data-close-drawer]')) {
+        closeReportDrawer(true);
+        return;
+      }
+      const copyButton = event.target.closest('[data-copy-report]');
+      if (copyButton && state.drawerKey) {
+        const [scenarioId, branchId] = state.drawerKey.split(':');
+        const scenario = getScenario(scenarioId);
+        if (scenario) copyReportSummary(scenario, getBranch(scenario, branchId));
+        return;
+      }
+      const sibling = event.target.closest('[data-sibling-report]');
+      if (sibling) {
+        const [scenarioId, branchId] = sibling.dataset.siblingReport.split(':');
+        navigateToReport(scenarioId, branchId);
+        return;
+      }
+      const fullTrace = event.target.closest('[data-full-trace]');
+      if (fullTrace) {
+        const [scenarioId, branchId] = fullTrace.dataset.fullTrace.split(':');
+        closeReportDrawer(false);
+        navigateToScenario(scenarioId, branchId);
+      }
+    });
+
     $('#modalRoot').addEventListener('click', (event) => {
       if (event.target === $('#modalRoot')) closeModal();
       const close = event.target.closest('[data-close-modal]');
@@ -888,7 +1296,22 @@
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
         if (state.modalOpen) closeModal();
+        else if (state.drawerOpen) closeReportDrawer(true);
         else closeSidebar();
+      }
+      if (event.key !== 'Tab' || !state.drawerOpen || state.modalOpen) return;
+      const focusRoot = $('#drawerContent');
+      const focusable = $$('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])', focusRoot)
+        .filter((node) => !node.hidden && node.getClientRects().length);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     });
 

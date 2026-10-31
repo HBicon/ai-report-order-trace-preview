@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#14232d">
-  <meta name="description" content="AI 报告订单追溯链路 Gate 2 可交互原型：面向内部运营，支持同一订单多份 AI 报告分支的只读追溯工作台。">
-  <title>报价追溯台 · AI 报告订单追溯链路</title>
+  <meta name="description" content="AI 报告订单追溯链路 Gate 2 可交互原型：以报告台账为入口，面向内部运营追溯同一订单多份 AI 报告的模型、标签、策略、报价与售后。">
+  <title>AI 报告追溯台账 · AI 报告订单追溯链路</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f766e'/%3E%3Cpath d='M17 34h8l4-10 6 20 4-10h8' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="../assets/app.css">
   <script src="../assets/icons.js" defer></script>
@@ -19,18 +19,19 @@
     <aside class="sidebar" id="sidebar" aria-label="主导航">
       <div class="sidebar-brand">
         <span class="brand-mark" aria-hidden="true">迹</span>
-        <span class="brand-copy"><strong>报价追溯台</strong><small>AI 报告 · 内部运营</small></span>
+            <span class="brand-copy"><strong>报告追溯台</strong><small>AI 报告 · 内部运营</small></span>
       </div>
 
       <div class="sidebar-section">
         <p class="sidebar-label">工作台</p>
         <nav class="side-nav">
-          <button class="active" type="button" data-filter="all"><span class="icon" data-icon="dashboard"></span><span>追溯总览</span></button>
-          <button type="button" data-filter="dual"><span class="icon" data-icon="gitBranch"></span><span>一单双报告</span><span class="nav-tag">新</span></button>
-          <button type="button" data-filter="unquoted"><span class="icon" data-icon="circleX"></span><span>未报价队列</span><span class="nav-count">18</span></button>
-          <button type="button" data-filter="anomaly"><span class="icon" data-icon="alertCircle"></span><span>报价异常线索</span><span class="nav-count">7</span></button>
-          <button type="button" data-filter="aftersales"><span class="icon" data-icon="receipt"></span><span>售后关联</span><span class="nav-count">3</span></button>
-          <button type="button" data-filter="incomplete"><span class="icon" data-icon="fileWarning"></span><span>证据不完整</span><span class="nav-count">2</span></button>
+          <button class="active" type="button" data-filter="all"><span class="icon" data-icon="dashboard"></span><span>报告追溯台账</span><span class="nav-count" data-side-count="all">0</span></button>
+          <button type="button" data-filter="dual"><span class="icon" data-icon="gitBranch"></span><span>一单双报告</span><span class="nav-count" data-side-count="dual">0</span></button>
+          <button type="button" data-filter="unquoted"><span class="icon" data-icon="circleX"></span><span>未报价</span><span class="nav-count" data-side-count="unquoted">0</span></button>
+          <button type="button" data-filter="anomaly"><span class="icon" data-icon="alertCircle"></span><span>不支持</span><span class="nav-count" data-side-count="anomaly">0</span></button>
+          <button type="button" data-filter="consistent"><span class="icon" data-icon="circleCheck"></span><span>支持</span><span class="nav-count" data-side-count="consistent">0</span></button>
+          <button type="button" data-filter="aftersales"><span class="icon" data-icon="receipt"></span><span>售后关联</span><span class="nav-count" data-side-count="aftersales">0</span></button>
+          <button type="button" data-filter="incomplete"><span class="icon" data-icon="fileWarning"></span><span>待补证</span><span class="nav-count" data-side-count="incomplete">0</span></button>
         </nav>
       </div>
 
@@ -62,7 +63,7 @@
         <label class="global-search" for="globalSearch">
           <span class="icon" data-icon="search"></span>
           <span class="sr-only">搜索订单、设备、AI 报告或 trace_id</span>
-          <input id="globalSearch" type="search" placeholder="搜索订单号、设备、AI 报告 ID 或 trace_id" autocomplete="off">
+          <input id="globalSearch" type="search" placeholder="搜索订单、报告 ID、策略、模型任务或 trace_id" autocomplete="off">
           <span class="search-hint">Enter</span>
         </label>
         <div class="topbar-actions">
@@ -80,12 +81,12 @@
         <section class="view" id="overviewView" aria-labelledby="overviewTitle">
           <div class="page-heading">
             <div>
-              <p class="eyebrow">Operational trace</p>
-              <h1 id="overviewTitle">报价追溯总览</h1>
-              <p class="heading-desc">先定位订单下的报告分支，再查看该分支的标签选择、报告、买家匹配与实际报价。</p>
+              <p class="eyebrow">Report ledger · P0 trace</p>
+              <h1 id="overviewTitle">AI 报告追溯台账</h1>
+              <p class="heading-desc">一行一份 AI 报告实例，先锁定具体报告，再分别追溯向前证据、策略映射、买家实际报价和成交售后。</p>
             </div>
             <div class="heading-side">
-              <span class="date-chip"><span class="icon" data-icon="clock"></span>2026-10-22 · 今日</span>
+              <span class="date-chip"><span class="icon" data-icon="clock"></span>2026-10-31 · 演示数据</span>
               <button class="button" type="button" id="exportOverview"><span class="icon" data-icon="download"></span>导出当前视图</button>
             </div>
           </div>
@@ -93,110 +94,130 @@
           <div class="outcome-strip" aria-label="追溯判定口径">
             <div class="outcome-item">
               <span class="outcome-icon success"><span class="icon" data-icon="circleCheck"></span></span>
-              <span class="outcome-copy"><strong>规则执行一致</strong><span>实际报价可由报告条件、规则与计价明细完整解释</span></span>
-              <span class="outcome-value">81%</span>
+              <span class="outcome-copy"><strong>支持</strong><span>当前报告的实际报价可由其规则链与买家记录解释</span></span>
+              <span class="outcome-value" id="outcomeSupported">0</span>
             </div>
             <div class="outcome-item">
               <span class="outcome-icon warning"><span class="icon" data-icon="alertCircle"></span></span>
-              <span class="outcome-copy"><strong>规则链差异</strong><span>定位首个规则、价档、扣减或回写差异，不生成第二价格</span></span>
-              <span class="outcome-value">7</span>
+              <span class="outcome-copy"><strong>不支持</strong><span>定位当前报告内首个规则、价档、扣减或回写差异</span></span>
+              <span class="outcome-value" id="outcomeUnsupported">0</span>
             </div>
             <div class="outcome-item">
               <span class="outcome-icon neutral"><span class="icon" data-icon="fileWarning"></span></span>
-              <span class="outcome-copy"><strong>证据不完整</strong><span>只展示已知事实和缺口，降级为待确认线索</span></span>
-              <span class="outcome-value">2</span>
+              <span class="outcome-copy"><strong>未报价 / 待补证</strong><span>先查报告或买家阻断点，再按证据缺口降级结论</span></span>
+              <span class="outcome-value" id="outcomePending">0</span>
             </div>
           </div>
 
           <div class="metric-grid" aria-label="今日关键指标">
             <div class="metric-card">
-              <div class="metric-label"><span class="icon" data-icon="layers"></span>今日新订单</div>
-              <div class="metric-value"><strong>1,284</strong><span>单</span></div>
-              <div class="metric-note">较昨日同时段 +6.2%</div>
+              <div class="metric-label"><span class="icon" data-icon="fileText"></span>AI 报告实例</div>
+              <div class="metric-value"><strong id="metricReports">0</strong><span>份</span></div>
+              <div class="metric-note">一行一份，不按订单合并</div>
             </div>
             <div class="metric-card">
-              <div class="metric-label"><span class="icon" data-icon="gitBranch"></span>已建立追溯链路</div>
-              <div class="metric-value"><strong>98.7</strong><span>%</span></div>
-              <div class="metric-note">17 单待补链路事件</div>
+              <div class="metric-label"><span class="icon" data-icon="layers"></span>涉及订单</div>
+              <div class="metric-value"><strong id="metricOrders">0</strong><span>单</span></div>
+              <div class="metric-note">同一订单可并行派生多份报告</div>
             </div>
             <div class="metric-card">
-              <div class="metric-label"><span class="icon" data-icon="circleX"></span>未报价待排查</div>
-              <div class="metric-value"><strong>18</strong><span>单</span></div>
-              <div class="metric-note alert">其中 3 单缺少买家级原因</div>
+              <div class="metric-label"><span class="icon" data-icon="circleX"></span>未报价报告</div>
+              <div class="metric-value"><strong id="metricUnquoted">0</strong><span>份</span></div>
+              <div class="metric-note alert">已记录订单级原因，详情定位买家</div>
             </div>
             <div class="metric-card">
-              <div class="metric-label"><span class="icon" data-icon="alertCircle"></span>规则链差异</div>
-              <div class="metric-value"><strong>7</strong><span>单</span></div>
-              <div class="metric-note danger">2 单为专项规则优先级</div>
+              <div class="metric-label"><span class="icon" data-icon="alertCircle"></span>不支持报告</div>
+              <div class="metric-value"><strong id="metricAnomaly">0</strong><span>份</span></div>
+              <div class="metric-note danger">只比较当前报告的规则链</div>
             </div>
             <div class="metric-card">
-              <div class="metric-label"><span class="icon" data-icon="fileWarning"></span>证据不完整</div>
-              <div class="metric-value"><strong>2</strong><span>单</span></div>
-              <div class="metric-note">待补模型响应或映射路径</div>
+              <div class="metric-label"><span class="icon" data-icon="receipt"></span>售后关联报告</div>
+              <div class="metric-value"><strong id="metricAfterSales">0</strong><span>份</span></div>
+              <div class="metric-note">按成交买家独立策略归属</div>
             </div>
           </div>
 
           <section class="panel" aria-labelledby="queueTitle">
             <header class="panel-head">
-              <div><h2 id="queueTitle">待排查订单</h2><p id="queueSubtitle">演示数据 · 6 个典型案例，按排查优先级排列</p></div>
-              <button class="panel-link" type="button" id="queueHelp"><span class="icon" data-icon="info"></span>判定说明</button>
+              <div><h2 id="queueTitle">报告追溯台账</h2><p id="queueSubtitle">报告级台账 · 正在加载报告实例</p></div>
+              <button class="panel-link" type="button" id="queueHelp"><span class="icon" data-icon="info"></span>追溯口径</button>
             </header>
             <div class="queue-toolbar">
-              <div class="segmented" id="queueFilters" aria-label="订单类型筛选">
-                <button class="active" type="button" data-queue-filter="all">全部 <span id="countAll">6</span></button>
-                <button type="button" data-queue-filter="dual">一单双报告 <span>1</span></button>
-                <button type="button" data-queue-filter="unquoted">未报价 <span id="countUnquoted">1</span></button>
-                <button type="button" data-queue-filter="anomaly">规则链差异 <span id="countAnomaly">1</span></button>
-                <button type="button" data-queue-filter="aftersales">售后关联 <span id="countAftersales">1</span></button>
-                <button type="button" data-queue-filter="incomplete">证据不完整 <span id="countIncomplete">1</span></button>
+              <div class="segmented" id="queueFilters" aria-label="报告类型筛选">
+                <button class="active" type="button" data-queue-filter="all" aria-pressed="true">全部 <span data-filter-count="all">0</span></button>
+                <button type="button" data-queue-filter="dual" aria-pressed="false">双报告 <span data-filter-count="dual">0</span></button>
+                <button type="button" data-queue-filter="unquoted" aria-pressed="false">未报价 <span data-filter-count="unquoted">0</span></button>
+                <button type="button" data-queue-filter="anomaly" aria-pressed="false">不支持 <span data-filter-count="anomaly">0</span></button>
+                <button type="button" data-queue-filter="consistent" aria-pressed="false">支持 <span data-filter-count="consistent">0</span></button>
+                <button type="button" data-queue-filter="aftersales" aria-pressed="false">售后 <span data-filter-count="aftersales">0</span></button>
+                <button type="button" data-queue-filter="incomplete" aria-pressed="false">待补证 <span data-filter-count="incomplete">0</span></button>
               </div>
               <label class="queue-search" for="queueSearch">
                 <span class="icon" data-icon="search"></span>
                 <span class="sr-only">筛选订单</span>
                 <input id="queueSearch" type="search" placeholder="筛选当前列表" autocomplete="off">
               </label>
+              <label class="ledger-select" for="ledgerModel">
+                <span class="icon" data-icon="tag"></span>
+                <span class="sr-only">按模型 code 筛选</span>
+                <select id="ledgerModel">
+                  <option value="all">全部模型 code</option>
+                  <option value="CAM-X2.3">CAM-X2.3</option>
+                  <option value="CAM-X3.1">CAM-X3.1</option>
+                </select>
+              </label>
+              <label class="ledger-select" for="ledgerAftersale">
+                <span class="icon" data-icon="packageCheck"></span>
+                <span class="sr-only">按售后关联筛选</span>
+                <select id="ledgerAftersale">
+                  <option value="all">成交/售后：全部</option>
+                  <option value="yes">仅售后关联</option>
+                  <option value="no">无售后关联</option>
+                </select>
+              </label>
             </div>
             <div class="table-wrap">
-              <table class="data-table">
+              <table class="data-table ledger-table">
                 <thead>
                   <tr>
                     <th scope="col">订单 / 设备</th>
-                    <th scope="col">问题入口</th>
-                    <th scope="col">AI 报告 / 分支</th>
-                    <th scope="col">分支实际报价</th>
-                    <th scope="col">链路判定</th>
-                    <th scope="col">最近节点</th>
-                    <th scope="col"><span class="sr-only">操作</span></th>
+                    <th scope="col">报告实例 / 成色</th>
+                    <th scope="col">买家策略 / 买家组</th>
+                    <th scope="col">模型任务 / 图片 / 标签</th>
+                    <th scope="col">AI 报告 / 店员上报</th>
+                    <th scope="col">实际报价 / 买家状态</th>
+                    <th scope="col">判定 / 成交售后</th>
                   </tr>
                 </thead>
                 <tbody id="queueBody"></tbody>
               </table>
             </div>
+            <div class="ledger-footnote"><span class="icon" data-icon="shield"></span><span><strong>价格口径：</strong>只核对当前报告分支内买家的实际报价。不跨报告分支、跨成色档比较高低，不展示成本价、市场价或规则重算价。</span></div>
           </section>
 
           <div class="overview-lower">
             <section class="panel" aria-labelledby="healthTitle">
-              <header class="panel-head"><div><h3 id="healthTitle">链路节点健康度</h3><p>今日新订单 · 各阶段成功建立证据的比例</p></div><span class="status-pill success no-dot">整体稳定</span></header>
+              <header class="panel-head"><div><h3 id="healthTitle">报告证据健康度</h3><p>报告实例 · 各层成功建立可回溯快照的比例</p></div><span class="status-pill success no-dot">演示快照</span></header>
               <div class="panel-body">
                 <div class="health-list">
-                  <div class="health-row"><span class="health-name">AI 输入与任务</span><span class="health-bar"><span style="width: 99.4%"></span></span><span class="health-value">99.4%</span></div>
-                  <div class="health-row"><span class="health-name">原始标签与阈值</span><span class="health-bar"><span style="width: 99.2%"></span></span><span class="health-value">99.2%</span></div>
-                  <div class="health-row"><span class="health-name">标签映射与报告</span><span class="health-bar"><span style="width: 98.8%"></span></span><span class="health-value">98.8%</span></div>
-                  <div class="health-row"><span class="health-name">规则命中与计价</span><span class="health-bar warn"><span style="width: 97.9%"></span></span><span class="health-value">97.9%</span></div>
-                  <div class="health-row"><span class="health-name">成交与售后关联</span><span class="health-bar"><span style="width: 98.5%"></span></span><span class="health-value">98.5%</span></div>
+                  <div class="health-row"><span class="health-name">报告身份与来源</span><span class="health-bar"><span style="width: 99.4%"></span></span><span class="health-value">99.4%</span></div>
+                  <div class="health-row"><span class="health-name">模型任务与阈值</span><span class="health-bar"><span style="width: 99.2%"></span></span><span class="health-value">99.2%</span></div>
+                  <div class="health-row"><span class="health-name">策略选择与映射</span><span class="health-bar"><span style="width: 98.8%"></span></span><span class="health-value">98.8%</span></div>
+                  <div class="health-row"><span class="health-name">买家报价矩阵</span><span class="health-bar warn"><span style="width: 97.9%"></span></span><span class="health-value">97.9%</span></div>
+                  <div class="health-row"><span class="health-name">成交与售后归属</span><span class="health-bar"><span style="width: 98.5%"></span></span><span class="health-value">98.5%</span></div>
                 </div>
-                <div class="health-note"><span class="icon" data-icon="info"></span><span>报价阶段存在少量规则链缺口。P0 不阻塞原交易链路，追溯不可用时仅标记“证据不完整”。</span></div>
+                <div class="health-note"><span class="icon" data-icon="info"></span><span>健康度是演示占位值。P0 真实口径必须按报告实例统计，不能把同一订单多份报告合并成一条链路。</span></div>
               </div>
             </section>
 
             <section class="panel" aria-labelledby="insightTitle">
-              <header class="panel-head"><div><h3 id="insightTitle">今日高频线索</h3><p>单笔问题的聚类摘要 · P1 才会形成正式策略建议</p></div><span class="status-pill neutral no-dot">只读观察</span></header>
+              <header class="panel-head"><div><h3 id="insightTitle">报告级高频线索</h3><p>单报告问题的聚类摘要 · P1 才形成策略与阈值建议</p></div><span class="status-pill neutral no-dot">只读观察</span></header>
               <div class="panel-body">
                 <div class="insight-list">
-                  <div class="insight-row"><span class="insight-rank">01</span><span class="insight-copy"><strong>专项规则优先级低于通用规则</strong><span>集中在“成色 + 特定扣减项”价格规则</span></span><span class="insight-count">5 单</span></div>
-                  <div class="insight-row"><span class="insight-rank">02</span><span class="insight-copy"><strong>买家扣减项未配置</strong><span>以 iPhone 后摄与屏幕问题为主</span></span><span class="insight-count">4 单</span></div>
-                  <div class="insight-row"><span class="insight-rank">03</span><span class="insight-copy"><strong>标签映射缺少严重度</strong><span>报告生成成功，但扣减来源不完整</span></span><span class="insight-count">3 单</span></div>
-                  <div class="insight-row"><span class="insight-rank">04</span><span class="insight-copy"><strong>模型响应快照缺失</strong><span>证据不完整，暂不进入规则归因</span></span><span class="insight-count">2 单</span></div>
+                  <div class="insight-row"><span class="insight-rank">01</span><span class="insight-copy"><strong>专项规则优先级低于通用规则</strong><span>按报告实例定位“成色 + 特定扣减项”规则链</span></span><span class="insight-count">2 份</span></div>
+                  <div class="insight-row"><span class="insight-rank">02</span><span class="insight-copy"><strong>同策略买家组出现未报价</strong><span>保留已报 / 未报矩阵与买家级原因</span></span><span class="insight-count">2 份</span></div>
+                  <div class="insight-row"><span class="insight-rank">03</span><span class="insight-copy"><strong>AI 与店员上报存在差异</strong><span>三方对照只针对当前报告，不合并分支</span></span><span class="insight-count">4 份</span></div>
+                  <div class="insight-row"><span class="insight-rank">04</span><span class="insight-copy"><strong>模型响应快照缺失</strong><span>证据不完整，暂不进入阈值归因</span></span><span class="insight-count">1 份</span></div>
                 </div>
                 <button class="button p1-preview-btn" type="button" data-open-p1="strategy"><span class="icon" data-icon="sparkles"></span>查看 P1 策略与阈值建议</button>
               </div>
@@ -206,7 +227,7 @@
 
         <section class="view" id="detailView" aria-labelledby="detailTitle" hidden>
           <div class="detail-back-row">
-            <button class="back-link" type="button" id="backToOverview"><span class="icon" data-icon="arrowLeft"></span>返回待排查订单</button>
+            <button class="back-link" type="button" id="backToOverview"><span class="icon" data-icon="arrowLeft"></span>返回报告台账</button>
             <span class="trace-id">trace_id：<span id="traceIdText"></span><button class="copy-button" type="button" id="copyTraceId" aria-label="复制 trace_id"><span class="icon" data-icon="copy"></span></button></span>
           </div>
 
@@ -253,6 +274,11 @@
       </main>
     </div>
   </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <aside class="report-drawer" id="reportDrawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" hidden>
+    <div class="drawer-content" id="drawerContent"></div>
+  </aside>
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
   <div class="modal-backdrop" id="modalRoot" hidden>
