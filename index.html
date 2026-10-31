@@ -27,8 +27,8 @@
       <div class="hero-inner">
         <p class="eyebrow">REQ-20261021-001 · Gate 2 方案评审</p>
         <h1>AI 报告订单追溯链路</h1>
-        <p class="hero-summary">以 AI 报告为中间锚点，先用“一行一份报告”的台账定位具体报告实例，再在单报告抽屉中向前还原买家独立策略、模型任务、图片、候选标签与阈值，向后查看策略买家组已报价/未报价矩阵、成交归属与售后。成交买家经独立策略自动关联报告，不同报告的结论和金额不合并。</p>
-        <div class="hero-meta"><span>版本 v1.3</span><span>Gate 1 已通过</span><span>Gate 2 方案评审中</span><span>更新于 2026-10-31</span><span>Owner 待确认</span></div>
+        <p class="hero-summary">以 AI 报告为中间锚点，先用“一行一份报告”的台账定位具体报告实例，再在单报告抽屉中向前还原买家独立策略、模型任务、图片、候选标签与阈值，向后按买家分别核验价格配置、扣减金额和实际报价。同一份报告可由多位买家使用，金额不同不构成高低异常；成交买家经独立策略自动关联报告，不同报告和不同买家的报价不合并比较。</p>
+        <div class="hero-meta"><span>版本 v1.4</span><span>Gate 1 已通过</span><span>Gate 2 方案评审中</span><span>更新于 2026-10-31</span><span>Owner 待确认</span></div>
         <div class="review-link-row"><span>Gate 1 通过证据：需求方整体确认 7 项评审重点</span><a href="review-record/">查看评审记录 →</a></div>
       </div>
     </section>
@@ -37,7 +37,7 @@
       <div class="facts-inner">
         <div class="fact"><p class="fact-label">交互入口</p><p class="fact-value">报告追溯台账</p><p class="fact-note">一行一份报告，不按订单合并</p></div>
         <div class="fact"><p class="fact-label">追溯锚点</p><p class="fact-value">报告实例</p><p class="fact-note">订单公共事实，报告证据独立</p></div>
-        <div class="fact"><p class="fact-label">价格口径</p><p class="fact-value">买家实际报价</p><p class="fact-note">不合并、不跨报告或成色档比价</p></div>
+        <div class="fact"><p class="fact-label">价格口径</p><p class="fact-value">各买家实际报价</p><p class="fact-note">同报告逐买家核验，不横向比价</p></div>
         <div class="fact"><p class="fact-label">优化延展</p><p class="fact-value">策略与阈值建议</p><p class="fact-note">P1 建议，P2 变更验证</p></div>
       </div>
     </section>
@@ -52,13 +52,13 @@
         <a class="artifact proposal" href="proposal/">
           <div class="artifact-top"><span class="artifact-number">01</span><span class="artifact-status">Gate 1 已确认</span></div>
           <h3>Proposal</h3><p class="artifact-role">问题、范围与关键决策</p>
-          <p class="artifact-description">说明为什么做、为谁做、P0/P1/P2 边界，以及报告台账、单报告抽屉、报告并行保留、买家实际报价、跨档取价、未报价原因和置信度阈值的确认口径。</p>
+          <p class="artifact-description">说明为什么做、为谁做、P0/P1/P2 边界，以及报告台账、单报告抽屉、报告并行保留、同报告多买家独立配置、实际报价、跨档取价、未报价原因和置信度阈值的确认口径。</p>
           <div class="artifact-open"><span>阅读方案</span><span>→</span></div>
         </a>
         <a class="artifact prototype" href="prototype/">
           <div class="artifact-top"><span class="artifact-number">02</span><span class="artifact-status">Gate 2 评审中</span></div>
           <h3>交互原型</h3><p class="artifact-role">页面、状态与主流程</p>
-          <p class="artifact-description">覆盖六个案例、七份报告：一单双报告、合法跨档取价、专项规则优先级异常、未报价、售后关联和证据不完整；含报告台账、单报告详情抽屉、已报价/未报价买家矩阵、分支对比、AI 证据与完整链路下钻。</p>
+          <p class="artifact-description">覆盖六个案例、七份报告：一单双报告、同一报告多买家不同价格与扣减、合法跨档取价、专项规则优先级异常、未报价、售后关联和证据不完整；含报告台账、单报告详情抽屉、买家级配置与扣减矩阵、分支对比、AI 证据与完整链路下钻。</p>
           <div class="artifact-open"><span>进入原型</span><span>→</span></div>
         </a>
         <div class="artifact specification disabled" aria-disabled="true">
@@ -106,12 +106,12 @@
         <div class="gate">
           <p class="gate-step">GATE 1 · 已通过</p>
           <h3>范围确认</h3>
-          <p>2026-10-21 需求方确认四快照、P0 场景、未报价原因复用、只读边界、唯一实际报价、跨档取价合法性和 P1/P2 优化边界。2026-10-22 补充“一个订单可能生成多份报告”，范围修正进入 Gate 2 复评。</p>
+          <p>2026-10-21 需求方确认四快照、P0 场景、未报价原因复用、只读边界、每位买家只保留实际报价、跨档取价合法性和 P1/P2 优化边界。2026-10-22 补充“一个订单可能生成多份报告”，2026-10-31 补充“同一报告内买家价格与扣减金额可不同”，范围修正进入 Gate 2 复评。</p>
         </div>
         <div class="gate">
           <p class="gate-step">GATE 2 · 进行中</p>
           <h3>方案评审</h3>
-          <p>等待业务、研发、测试评审报告台账的信息层级、报告级与买家级状态、同策略买家组已报/未报矩阵、报告并行保留、独立模型任务、成交买家自动归属、AI 证据、售后摘要、数据来源、角色权限和异常处理。</p>
+          <p>等待业务、研发、测试评审报告台账的信息层级、报告级与买家级状态、同报告多买家独立价格与扣减矩阵、报告并行保留、独立模型任务、成交买家自动归属、AI 证据、售后摘要、数据来源、角色权限和异常处理。</p>
         </div>
         <div class="gate">
           <p class="gate-step">GATE 3 · 未开始</p>
@@ -167,7 +167,7 @@
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <span>REQ-20261021-001 · AI 报告订单追溯链路 · v1.3 · 2026-10-31</span>
+      <span>REQ-20261021-001 · AI 报告订单追溯链路 · v1.4 · 2026-10-31</span>
       <div class="footer-links">
         <a href="proposal/">Proposal</a>
         <a href="prototype/">原型</a>

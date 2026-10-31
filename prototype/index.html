@@ -83,7 +83,7 @@
             <div>
               <p class="eyebrow">Report ledger · P0 trace</p>
               <h1 id="overviewTitle">AI 报告追溯台账</h1>
-              <p class="heading-desc">一行一份 AI 报告实例，先锁定具体报告，再分别追溯向前证据、策略映射、买家实际报价和成交售后。</p>
+              <p class="heading-desc">一行一份 AI 报告实例；先锁定报告，再按买家分别核验价格配置、扣减金额、实际报价与成交售后。</p>
             </div>
             <div class="heading-side">
               <span class="date-chip"><span class="icon" data-icon="clock"></span>2026-10-31 · 演示数据</span>
@@ -94,7 +94,7 @@
           <div class="outcome-strip" aria-label="追溯判定口径">
             <div class="outcome-item">
               <span class="outcome-icon success"><span class="icon" data-icon="circleCheck"></span></span>
-              <span class="outcome-copy"><strong>支持</strong><span>当前报告的实际报价可由其规则链与买家记录解释</span></span>
+              <span class="outcome-copy"><strong>支持</strong><span>所有已报价买家均可由各自价格配置与规则链解释</span></span>
               <span class="outcome-value" id="outcomeSupported">0</span>
             </div>
             <div class="outcome-item">
@@ -123,7 +123,7 @@
             <div class="metric-card">
               <div class="metric-label"><span class="icon" data-icon="circleX"></span>未报价报告</div>
               <div class="metric-value"><strong id="metricUnquoted">0</strong><span>份</span></div>
-              <div class="metric-note alert">已记录订单级原因，详情定位买家</div>
+              <div class="metric-note alert">已记录订单级原因，详情定位到买家</div>
             </div>
             <div class="metric-card">
               <div class="metric-label"><span class="icon" data-icon="alertCircle"></span>不支持报告</div>
@@ -185,14 +185,14 @@
                     <th scope="col">买家策略 / 买家组</th>
                     <th scope="col">模型任务 / 图片 / 标签</th>
                     <th scope="col">AI 报告 / 店员上报</th>
-                    <th scope="col">实际报价 / 买家状态</th>
+                    <th scope="col">各买家实际报价 / 状态</th>
                     <th scope="col">判定 / 成交售后</th>
                   </tr>
                 </thead>
                 <tbody id="queueBody"></tbody>
               </table>
             </div>
-            <div class="ledger-footnote"><span class="icon" data-icon="shield"></span><span><strong>价格口径：</strong>只核对当前报告分支内买家的实际报价。不跨报告分支、跨成色档比较高低，不展示成本价、市场价或规则重算价。</span></div>
+            <div class="ledger-footnote"><span class="icon" data-icon="shield"></span><span><strong>买家价格口径：</strong>同一报告可被多位买家使用，每位买家的价格配置和扣减金额独立；同报告金额不同不构成高低异常。不跨买家、报告分支或成色档比价，不展示成本价、市场价或规则重算价。</span></div>
           </section>
 
           <div class="overview-lower">
@@ -215,9 +215,10 @@
               <div class="panel-body">
                 <div class="insight-list">
                   <div class="insight-row"><span class="insight-rank">01</span><span class="insight-copy"><strong>专项规则优先级低于通用规则</strong><span>按报告实例定位“成色 + 特定扣减项”规则链</span></span><span class="insight-count">2 份</span></div>
-                  <div class="insight-row"><span class="insight-rank">02</span><span class="insight-copy"><strong>同策略买家组出现未报价</strong><span>保留已报 / 未报矩阵与买家级原因</span></span><span class="insight-count">2 份</span></div>
-                  <div class="insight-row"><span class="insight-rank">03</span><span class="insight-copy"><strong>AI 与店员上报存在差异</strong><span>三方对照只针对当前报告，不合并分支</span></span><span class="insight-count">4 份</span></div>
-                  <div class="insight-row"><span class="insight-rank">04</span><span class="insight-copy"><strong>模型响应快照缺失</strong><span>证据不完整，暂不进入阈值归因</span></span><span class="insight-count">1 份</span></div>
+                  <div class="insight-row"><span class="insight-rank">02</span><span class="insight-copy"><strong>同报告买家配置不同</strong><span>价格与扣减金额分别快照，逐买家核验</span></span><span class="insight-count">演示</span></div>
+                  <div class="insight-row"><span class="insight-rank">03</span><span class="insight-copy"><strong>同报告部分买家未报价</strong><span>保留已报 / 未报矩阵与买家级原因</span></span><span class="insight-count">1 份</span></div>
+                  <div class="insight-row"><span class="insight-rank">04</span><span class="insight-copy"><strong>AI 与店员上报存在差异</strong><span>三方对照只针对当前报告，不合并分支</span></span><span class="insight-count">4 份</span></div>
+                  <div class="insight-row"><span class="insight-rank">05</span><span class="insight-copy"><strong>模型响应快照缺失</strong><span>证据不完整，暂不进入阈值归因</span></span><span class="insight-count">1 份</span></div>
                 </div>
                 <button class="button p1-preview-btn" type="button" data-open-p1="strategy"><span class="icon" data-icon="sparkles"></span>查看 P1 策略与阈值建议</button>
               </div>

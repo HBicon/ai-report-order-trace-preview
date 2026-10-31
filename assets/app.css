@@ -635,13 +635,13 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
 .ledger-select::after { content: ""; width: 6px; height: 6px; position: absolute; right: 11px; top: 10px; border-right: 1.5px solid var(--subtle); border-bottom: 1.5px solid var(--subtle); transform: rotate(45deg); pointer-events: none; }
 .ledger-select select:focus { border-color: #83bbb4; box-shadow: 0 0 0 2px rgba(15,118,110,.08); }
 .ledger-table { min-width: 1110px; table-layout: fixed; }
-.ledger-table th:nth-child(1) { width: 14%; }
-.ledger-table th:nth-child(2) { width: 13.5%; }
-.ledger-table th:nth-child(3) { width: 14%; }
-.ledger-table th:nth-child(4) { width: 17.5%; }
-.ledger-table th:nth-child(5) { width: 16.5%; }
-.ledger-table th:nth-child(6) { width: 12%; }
-.ledger-table th:nth-child(7) { width: 12.5%; }
+.ledger-table th:nth-child(1) { width: 13%; }
+.ledger-table th:nth-child(2) { width: 13%; }
+.ledger-table th:nth-child(3) { width: 13.5%; }
+.ledger-table th:nth-child(4) { width: 17%; }
+.ledger-table th:nth-child(5) { width: 15.5%; }
+.ledger-table th:nth-child(6) { width: 14.5%; }
+.ledger-table th:nth-child(7) { width: 13.5%; }
 .ledger-table td { padding: 13px 11px; position: relative; vertical-align: top; }
 .ledger-row.multi-report { background: linear-gradient(90deg, rgba(231,245,242,.45), #fff 22%); }
 .ledger-row.multi-report td:first-child { box-shadow: inset 3px 0 0 #69bdb3; }
@@ -664,6 +664,9 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
 .ledger-tag-row i { max-width: 100%; overflow: hidden; padding: 2px 5px; border-radius: 3px; color: #526171; background: var(--surface-soft); font-size: 7px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
 .ledger-quote { display: grid; gap: 4px; }
 .ledger-quote > strong { color: var(--teal-dark); font-size: 13px; font-variant-numeric: tabular-nums; line-height: 1.25; white-space: nowrap; }
+.quote-buyer-lines { display: grid; gap: 2px; }
+.quote-buyer-lines > span { color: var(--teal-dark); font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.35; white-space: nowrap; }
+.quote-buyer-lines > span b { margin-right: 3px; color: var(--ink-soft); font-size: 8px; }
 .ledger-quote.empty > strong { color: var(--red); font-size: 11px; }
 .ledger-quote > span { color: var(--ink-soft); font-size: 8px; }
 .ledger-quote > small { display: -webkit-box; overflow: hidden; color: var(--subtle); font-size: 7px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
@@ -760,8 +763,17 @@ body.drawer-open { overflow: hidden; }
 .drawer-compare-grid span { display: block; color: var(--muted); font-size: 7px; }
 .drawer-compare-grid strong { margin-top: 5px; display: block; color: var(--ink); font-size: 8.5px; line-height: 1.5; }
 .drawer-compare-grid p { margin: 5px 0 0; color: var(--subtle); font-size: 7px; line-height: 1.55; }
-.buyer-table { min-width: 650px; }
+.buyer-table { min-width: 920px; }
 .buyer-table .buyer-amount { color: var(--teal-dark); font-size: 10px; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.buyer-price-config { color: #526f7b !important; font-family: "SFMono-Regular", Consolas, monospace; }
+.buyer-deduction-text { font-weight: 600 !important; white-space: normal; }
+.buyer-config-banner { margin-top: 11px; padding: 11px 12px; display: flex; align-items: flex-start; gap: 9px; border: 1px solid #d9e8e5; border-radius: 6px; background: #f5fbf9; }
+.buyer-config-banner > .icon { width: 16px; height: 16px; flex: 0 0 auto; color: var(--teal); }
+.buyer-config-banner strong { display: block; color: var(--ink-soft); font-size: 9px; }
+.buyer-config-banner p { margin: 3px 0 0; color: #60727b; font-size: 8px; line-height: 1.6; }
+.buyer-matrix-note { margin-top: 8px; }
+.quote-buyer-section { margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+.quote-buyer-section .section-title-row { margin: 0 0 4px; }
 .drawer-downstream { margin-top: 11px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid #e5eaee; border-radius: 5px; overflow: hidden; }
 .drawer-downstream > div { min-width: 0; min-height: 62px; padding: 9px 10px; border-right: 1px solid #edf0f3; }
 .drawer-downstream > div:last-child { border-right: 0; }

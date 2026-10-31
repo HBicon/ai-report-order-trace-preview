@@ -47,7 +47,7 @@
     mapping: ['先记录当前报告分支选取/排除了哪些本分支 AI 标签，再看标签映射。', '映射必须使用报价时版本，不能以当前配置反推历史。', '映射链路中有缺口时，仅当前分支结论降级为待确认线索。'],
     report: ['每个报告实例是只读决策快照，不支持人工修改。', '订单可以有多份报告，报告“唯一”只约束单个报告实例内结论。', '报告项需要能追溯到本分支原始标签和当前分支映射规则。'],
     eligibility: ['买家独立策略在报告生成前决定报告买家组。', '报告生成后不再做买家再匹配；同一策略可绑定多个买家。', '归属关系需保留买家、策略 ID/版本和报告实例的稳定关联。'],
-    quote: ['每份报告、每位买家、每次报价只保留一个报价结果：实际报价。', '“成色 + 特定扣减项”命中后按其他成色价出价属于合法业务。', '系统不跨报告分支、跨成色档或基于外部基准生成高低结论，只核对当前分支规则链。'],
+    quote: ['同一份报告可以被多位买家使用，但每位买家的价格配置和扣减金额独立。', '每份报告、每位买家、每次报价只保留一个报价结果：实际报价；同报告买家金额不同不构成异常。', '系统不跨买家、跨报告分支或跨成色档生成高低结论，只逐买家核对报价时规则链。'],
     downstream: ['P0 按成交报告实例关联复检、售后状态和差异摘要。', '成交买家确定后按“成交买家 → 独立策略 → 报告实例”自动归属。', '售后差异不反向改写成交前的报告与报价快照。']
   };
 
@@ -162,45 +162,68 @@
     const quote = branchQuote(scenario, branch);
     const downstream = branchDownstream(scenario, branch);
     const buyerRows = branchBuyerRows(scenario, branch);
-    const partialUnquoted = buyerRows.filter((item) => item.status === 'unquoted').length;
-    if (branch.amountValue == null || quote.amountRaw == null) {
+    const quotedRows = buyerRows.filter((item) => item.status === 'quoted');
+    const unquotedRows = buyerRows.filter((item) => item.status === 'unquoted');
+    const divergentRows = quotedRows.filter((item) => item.diagnosisTone === 'danger' || /规则链差异/.test(item.diagnosis || ''));
+    const incompleteRows = quotedRows.filter((item) => item.diagnosisTone === 'neutral' || /待补证/.test(item.diagnosis || ''));
+    if (branch.amountValue == null || quote.amountRaw == null || !quotedRows.length) {
       return { key: 'unquoted', label: '未报价', detail: '已定位阻断点', tone: 'danger' };
     }
-    if (scenario.filter === 'incomplete' || branch.completenessPct < 70) {
+    if (scenario.filter === 'incomplete' || branch.completenessPct < 70 || (!divergentRows.length && incompleteRows.length)) {
       return { key: 'incomplete', label: '待补证', detail: '上游证据缺失', tone: 'neutral' };
     }
-    if (branch.badgeTone === 'danger' || quote.statusTone === 'danger') {
-      return { key: 'unsupported', label: '不支持', detail: partialUnquoted ? `规则链差异 · ${partialUnquoted} 个买家未报` : '规则链存在差异', tone: 'danger' };
+    if (branch.badgeTone === 'danger' || quote.statusTone === 'danger' || divergentRows.length) {
+      const divergence = divergentRows.length
+        ? `${divergentRows.length} 个买家规则差异${quotedRows.length > 1 ? ` · ${quotedRows.length} 已报` : ''}`
+        : '规则链存在差异';
+      const unquoted = unquotedRows.length ? ` · ${unquotedRows.length} 买家未报` : '';
+      return { key: 'unsupported', label: '不支持', detail: `${divergence}${unquoted}`, tone: 'danger' };
     }
+    const quoteDetail = `${quotedRows.length}/${buyerRows.length} 买家报价可解释`;
     if (downstream.afterSale || scenario.filter === 'aftersales') {
-      return { key: 'supported', label: '支持', detail: partialUnquoted ? `报价可解释 · ${partialUnquoted} 个买家未报 · 售后差异` : '报价可解释 · 售后差异', tone: 'warning' };
+      return { key: 'supported', label: '支持', detail: `${quoteDetail} · 售后差异`, tone: 'warning' };
     }
-    return { key: 'supported', label: '支持', detail: partialUnquoted ? `报价可解释 · ${partialUnquoted} 个买家未报` : '报价链完整解释', tone: 'success' };
+    return { key: 'supported', label: '支持', detail: unquotedRows.length ? `${quoteDetail} · ${unquotedRows.length} 买家未报` : quoteDetail, tone: 'success' };
   }
 
   function branchBuyerRows(scenario, branch) {
     if (Array.isArray(branch.buyerQuotes) && branch.buyerQuotes.length) return branch.buyerQuotes;
     const audience = branchAudience(scenario, branch);
+    const strategy = branchStrategy(scenario, branch);
     const quote = branchQuote(scenario, branch);
     const hitRule = (quote.rules || []).find((rule) => rule.hit);
     const priceTier = (quote.lines || []).find((line) => line.kind === 'base');
+    const priceConfigMatch = String(priceTier && priceTier.source || '').match(/价格配置\s+([A-Z0-9-]+)/i);
+    const priceConfig = priceConfigMatch ? priceConfigMatch[1] : '报价配置快照待补';
+    const deductions = (quote.lines || []).filter((line) => line.kind === 'deduction')
+      .map((line) => `${line.label} ${line.amount < 0 ? '−' : ''}${Math.abs(line.amount).toLocaleString('zh-CN')}`)
+      .join(' · ');
     const quotedBuyer = String(branch.buyer || '').replace(/^合作买家\s*/, '');
     if (branch.amountValue == null) {
       const reasonItem = (quote.difference && quote.difference.items || []).find(([label]) => /订单级原因|首个阻断点/.test(label));
       const reason = reasonItem ? reasonItem[1] : branch.unquotedReason || '未报价原因已记录，详情待补';
       return audience.buyers.map((buyer, index) => ({
-        buyer, status: 'unquoted', amount: '—', rule: '—', priceTier: '—',
+        buyer, status: 'unquoted', amount: '—', strategy: `${strategy.id} ${strategy.version}`, priceConfig: '报价配置快照待补',
+        rule: '—', priceTier: '—', deductions: '扣减快照待补', deductionIds: '',
+        diagnosis: '未报价', diagnosisTone: 'danger',
         reason: index === 0 ? reason : '同一策略买家组内未生成报价'
       }));
     }
     return audience.buyers.map((buyer) => {
       const isQuoted = buyer === quotedBuyer || audience.buyers.length === 1;
+      const quotientDiagnosis = quote.statusTone === 'danger' ? '规则链差异' : quote.statusTone === 'warning' ? '待补证' : '规则执行一致';
       return {
         buyer,
         status: isQuoted ? 'quoted' : 'not-included',
         amount: isQuoted ? branch.amount || quote.amount : '—',
+        strategy: `${strategy.id} ${strategy.version}`,
+        priceConfig: isQuoted ? priceConfig : '未进入本次报价',
         rule: isQuoted ? hitRule ? `${hitRule.id} · 优先级 ${hitRule.priority}` : '规则快照待补' : '—',
         priceTier: isQuoted ? priceTier ? priceTier.label : '实际取用价档待补' : '—',
+        deductions: isQuoted ? deductions || '无扣减项' : '—',
+        deductionIds: '',
+        diagnosis: isQuoted ? quotientDiagnosis : '未进入报价',
+        diagnosisTone: isQuoted ? (quote.statusTone || 'success') : 'neutral',
         reason: isQuoted ? quote.statusLabel || '已生成实际报价' : '未进入本次报价的买家级结果'
       };
     });
@@ -302,8 +325,14 @@
         const selected = branch.selectedLabels || candidates.filter((item) => item.accepted).map((item) => item.label);
         const topLabels = selected.slice(0, 2);
         const quote = branchQuote(scenario, branch);
-        const quotedCount = buyerRows.filter((item) => item.status === 'quoted').length;
-        const unquotedCount = buyerRows.filter((item) => item.status === 'unquoted').length;
+        const quotedRows = buyerRows.filter((item) => item.status === 'quoted');
+        const unquotedRows = buyerRows.filter((item) => item.status === 'unquoted');
+        const quotedCount = quotedRows.length;
+        const unquotedCount = unquotedRows.length;
+        const quoteLines = quotedRows.slice(0, 2).map((item) => `<span><b>${esc(item.buyer)}</b> ${esc(item.amount)}</span>`).join('');
+        const quoteFootnote = unquotedCount
+          ? unquotedRows.map((item) => `${item.buyer}：${item.reason}`).join('；')
+          : quotedCount > 1 ? '按各买家价格与扣减配置独立核验' : quote.attempt || '实际报价';
         const mappingCount = mappings.filter((item) => !item.filtered).length;
         const afterSale = downstream.afterSale;
         const deal = (downstream.summary || []).find((item) => /中标买家|成交买家|成交/.test(item.label));
@@ -330,8 +359,8 @@
           <td data-label="AI 报告 / 店员上报">
             <div class="ledger-stack"><strong>${esc(topLabels.join(' + ') || branch.issues.join(' + ') || '报告项待核')}</strong><span>${esc(branch.reportGrade)} · 映射 ${mappingCount} 条</span><small>${esc(branchStaffReport(scenario, branch))}</small></div>
           </td>
-          <td data-label="实际报价 / 买家状态">
-            <div class="ledger-quote ${branch.amountValue == null ? 'empty' : ''}"><strong>${branch.amountValue == null ? '未报价' : esc(branch.amount)}</strong><span>${quotedCount} 已报 / ${unquotedCount} 未报</span><small>${branch.amountValue == null ? esc(buyerRows[0] ? buyerRows[0].reason : '未报价原因待补') : esc(quote.attempt || '实际报价')}</small></div>
+          <td data-label="各买家实际报价 / 状态">
+            <div class="ledger-quote ${quotedCount ? '' : 'empty'}">${quotedCount ? `<div class="quote-buyer-lines">${quoteLines}</div>` : '<strong>未报价</strong>'}<span>${quotedCount}/${buyerRows.length} 已报${unquotedCount ? ` · ${unquotedCount} 未报` : ' · 金额不横向比较'}</span><small>${esc(quoteFootnote)}</small></div>
           </td>
           <td data-label="判定 / 成交售后">
             <div class="ledger-conclusion"><span class="status-pill ${esc(conclusion.tone)}">${esc(conclusion.label)}</span><span>${esc(conclusion.detail)}</span><small>${esc(dealText)}</small></div>
@@ -478,6 +507,31 @@
     else if (window.location.hash === '#overview' || window.location.hash === '') document.title = 'AI 报告追溯台账 · AI 报告订单追溯链路';
   }
 
+  function renderBuyerQuoteMatrix(buyerRows, audience) {
+    const buyerCount = buyerRows.length;
+    const priceConfigs = new Set(buyerRows.map((row) => row.priceConfig).filter(Boolean));
+    const banner = buyerCount > 1 || priceConfigs.size > 1
+      ? `<div class="buyer-config-banner">${ic('users')}<div><strong>同一报告，多套买家配置</strong><p>报告条件只生成一次；每位买家按自己的价格配置版本、成色价档和扣减金额分别报价。买家金额不同不构成高低异常，报告级结论汇总买家级核验结果。</p></div></div>`
+      : '';
+    if (!buyerRows.length) {
+      return `${banner}<div class="drawer-table-wrap"><table class="drawer-table buyer-table"><thead><tr><th>买家 / 配置</th><th>状态</th><th>实际报价</th><th>规则 / 实际价档</th><th>买家扣减快照</th><th>买家级诊断</th></tr></thead><tbody><tr><td colspan="6">买家报价记录待补</td></tr></tbody></table></div>`;
+    }
+    const rows = buyerRows.map((row) => {
+      const statusLabel = row.status === 'quoted' ? '已报价' : row.status === 'unquoted' ? '未报价' : '未进入本次报价';
+      const statusTone = row.status === 'quoted' ? 'success' : row.status === 'unquoted' ? 'danger' : 'neutral';
+      const diagnosisTone = row.diagnosisTone || (row.status === 'unquoted' ? 'danger' : 'neutral');
+      return `<tr>
+        <td><strong>${esc(row.buyer)}</strong><small>${esc(row.strategy || audience.label || '买家策略快照')}</small><small class="buyer-price-config">${esc(row.priceConfig || '价格配置快照待补')}</small></td>
+        <td><span class="status-pill ${statusTone} no-dot">${statusLabel}</span></td>
+        <td class="buyer-amount">${esc(row.amount || '—')}</td>
+        <td><strong>${esc(row.rule || '规则快照待补')}</strong><small>${esc(row.priceTier || '实际价档待补')}</small></td>
+        <td><strong class="buyer-deduction-text">${esc(row.deductions || '扣减快照待补')}</strong><small>${esc(row.deductionIds || '')}</small></td>
+        <td><span class="status-pill ${esc(diagnosisTone)} no-dot">${esc(row.diagnosis || '待核')}</span><small>${esc(row.reason || '')}</small></td>
+      </tr>`;
+    }).join('');
+    return `${banner}<div class="drawer-table-wrap"><table class="drawer-table buyer-table"><thead><tr><th>买家 / 配置</th><th>状态</th><th>实际报价</th><th>规则 / 实际价档</th><th>买家扣减快照</th><th>买家级诊断</th></tr></thead><tbody>${rows}</tbody></table></div><div class="drawer-note buyer-matrix-note">${ic('info')}<span>价格配置、扣减金额和实际报价均为报价时快照。系统只核对每位买家自己的规则链，不使用同报告其他买家的金额作为高低基准。</span></div>`;
+  }
+
   function renderReportDrawer(scenario, branch) {
     const branches = branchesOf(scenario);
     const model = branchModel(scenario, branch);
@@ -489,6 +543,7 @@
     const downstream = branchDownstream(scenario, branch);
     const quote = branchQuote(scenario, branch);
     const conclusion = branchConclusion(scenario, branch);
+    const quotedRows = buyerRows.filter((row) => row.status === 'quoted');
     const selected = branch.selectedLabels || candidates.filter((item) => item.accepted).map((item) => item.label);
     const accepted = candidates.filter((item) => item.accepted).length;
     const afterSale = downstream.afterSale;
@@ -507,11 +562,6 @@
         <td>${mapping ? `<strong>${esc(mapping.option)}</strong><small>${esc(mapping.severity)} · ${esc(mapping.report)}</small>` : '<span class="muted-text">未映射 / 未进入报告</span>'}</td>
       </tr>`;
     }).join('') : `<tr><td colspan="5"><div class="drawer-missing">${ic('fileWarning')}<span>候选标签与映射快照缺失，无法用当前配置补造历史路径。</span></div></td></tr>`;
-    const buyerRowsHtml = buyerRows.map((row) => {
-      const statusLabel = row.status === 'quoted' ? '已报价' : row.status === 'unquoted' ? '未报价' : '未进入本次报价';
-      const tone = row.status === 'quoted' ? 'success' : row.status === 'unquoted' ? 'danger' : 'neutral';
-      return `<tr><td><strong>${esc(row.buyer)}</strong><small>${esc(audience.label)}</small></td><td><span class="status-pill ${tone} no-dot">${statusLabel}</span></td><td class="buyer-amount">${esc(row.amount)}</td><td><strong>${esc(row.rule)}</strong><small>${esc(row.priceTier)}</small></td><td>${esc(row.reason)}</td></tr>`;
-    }).join('');
     const downstreamCards = (downstream.summary || []).map((item) => `<div><span>${esc(item.label)}</span><strong>${esc(item.value)}</strong><small>${esc(item.note)}</small></div>`).join('');
     const siblingHtml = branches.length > 1 ? `<div class="drawer-siblings"><div>${ic('gitBranch')}<span><strong>本订单共 ${branches.length} 份报告</strong><small>当前只查看 ${esc(branch.label)}；切换仅改变分支，不合并报告结论。</small></span></div><div class="drawer-sibling-actions">${siblings.map((item) => `<button class="button small" type="button" data-sibling-report="${esc(scenario.id)}:${esc(item.id)}">查看 ${esc(item.label)}</button>`).join('')}</div></div>` : '';
 
@@ -527,7 +577,7 @@
       </div>
       ${siblingHtml}
       <div class="drawer-verdict ${esc(branch.verdict.tone)}"><span class="drawer-verdict-icon">${ic(branch.verdict.icon)}</span><div><span class="status-pill ${esc(branch.badgeTone)} no-dot">${esc(branch.verdict.label)}</span><h3>${esc(branch.verdict.title)}</h3><p>${esc(branch.verdict.description)}</p></div><span class="drawer-completeness">${esc(branch.completenessText)}<b>${esc(branch.completenessPct)}%</b></span></div>
-      <div class="drawer-metrics"><div><span>报告成色</span><strong>${esc(branch.reportGrade)}</strong><small>${branch.issues.length} 个问题项</small></div><div><span>实际报价</span><strong>${branch.amountValue == null ? '未报价' : esc(branch.amount)}</strong><small>${branch.amountValue == null ? '不生成推测金额' : '买家实际报价'}</small></div><div><span>策略买家组</span><strong>${audience.buyers.length} 个</strong><small>${esc(audience.buyers.join(' / '))}</small></div><div><span>下游</span><strong>${afterSale ? esc(afterSale.status) : downstream.summary && downstream.summary.length ? '已关联' : '待关联'}</strong><small>${afterSale ? esc(afterSale.id) : '成交与售后摘要'}</small></div></div>
+      <div class="drawer-metrics"><div><span>报告成色</span><strong>${esc(branch.reportGrade)}</strong><small>${branch.issues.length} 个问题项</small></div><div><span>买家报价</span><strong>${quotedRows.length}/${buyerRows.length} 已报</strong><small>${quotedRows.length ? quotedRows.map((row) => `${row.buyer} ${row.amount}`).join(' · ') : '不生成推测金额'}</small></div><div><span>策略买家组</span><strong>${audience.buyers.length} 个</strong><small>${esc(audience.buyers.join(' / '))}</small></div><div><span>下游</span><strong>${afterSale ? esc(afterSale.status) : downstream.summary && downstream.summary.length ? '已关联' : '待关联'}</strong><small>${afterSale ? esc(afterSale.id) : '成交与售后摘要'}</small></div></div>
 
       <section class="drawer-section">
         <header><div><h3>报告身份与数据来源</h3><p>以报告实例为锚点，不从当前配置反推历史。</p></div><span class="status-pill neutral no-dot">只读</span></header>
@@ -567,9 +617,8 @@
       </section>
 
       <section class="drawer-section">
-        <header><div><h3>向后追溯 · 报价买家矩阵</h3><p>每个买家只保留实际报价；未报价买家保留订单级原因及本报告归属。</p></div><span class="status-pill ${esc(quote.statusTone || 'neutral')} no-dot">${esc(quote.statusLabel || '报价快照')}</span></header>
-        <div class="drawer-table-wrap"><table class="drawer-table buyer-table"><thead><tr><th>买家</th><th>状态</th><th>实际报价</th><th>命中规则 / 实际取用价档</th><th>说明</th></tr></thead><tbody>${buyerRowsHtml || '<tr><td colspan="5">买家报价记录待补</td></tr>'}</tbody></table></div>
-        <div class="drawer-note">${ic('info')}<span>不展示应得报价、成本价、市场价、规则重算价或跨成色档基准；每份报告、每个买家只展示买家实际报价。</span></div>
+        <header><div><h3>向后追溯 · 买家独立报价矩阵</h3><p>同一报告下，每位买家按各自价格配置和扣减金额独立核验；未报价买家保留本报告归属和阻断原因。</p></div><span class="status-pill ${esc(conclusion.tone)} no-dot">${esc(conclusion.label)} · ${esc(conclusion.detail)}</span></header>
+        ${renderBuyerQuoteMatrix(buyerRows, audience)}
       </section>
 
       <section class="drawer-section">
@@ -578,7 +627,7 @@
         ${afterSale ? `<div class="drawer-after-sale">${ic('alertCircle')}<div><strong>${esc(afterSale.id)} · ${esc(afterSale.issue)}</strong><p>${esc(afterSale.impact)} · 负责人 ${esc(afterSale.owner)}</p></div></div>` : ''}
         <div class="drawer-note">${ic('shield')}<span>报告、报价、成交归属和售后关联均为只读快照；售后差异不会反向改写成交前的 AI 报告。</span></div>
       </section>
-      <div class="drawer-footer"><span>REQ-20261021-001 · v1.3 · ${esc(branch.instanceId)}</span><button class="button primary small" type="button" data-full-trace="${esc(scenario.id)}:${esc(branch.id)}">${ic('external')}查看完整全链路</button></div>
+      <div class="drawer-footer"><span>REQ-20261021-001 · v1.4 · ${esc(branch.instanceId)}</span><button class="button primary small" type="button" data-full-trace="${esc(scenario.id)}:${esc(branch.id)}">${ic('external')}查看完整全链路</button></div>
     </div>`;
   }
 
@@ -622,7 +671,7 @@
         tab.hidden = branches.length < 2;
         tab.innerHTML = `分支对比<span class="tab-count">${branches.length}</span>`;
       }
-      if (tabId === 'quote') tab.innerHTML = `分支报价<span class="tab-count">${branch.quote.rules.length}</span>`;
+      if (tabId === 'quote') tab.innerHTML = `买家报价<span class="tab-count">${branchBuyerRows(scenario, branch).length}</span>`;
       if (tabId === 'evidence') tab.innerHTML = `AI 证据<span class="tab-count">${branchImages(scenario, branch).length}</span>`;
       if (tabId === 'downstream') tab.innerHTML = `成交与售后<span class="tab-count">${branch.downstream.events.length || '—'}</span>`;
     });
@@ -754,8 +803,12 @@
       ['策略选用标签', (branch) => (branch.selectedLabels || []).join(' · ') || branch.strategy.selected || '—'],
       ['报告实例 / 成色', (branch) => `${branch.instanceId} · ${branch.reportGrade}`],
       ['报告问题项', (branch) => (branch.issues || []).join(' · ') || '报告项待核'],
-      ['规则链结论', (branch) => branch.quote.statusLabel],
-      ['分支实际报价', (branch) => branch.amount || '未报价'],
+      ['报告级结论', (branch) => {
+        const conclusion = branchConclusion(scenario, branch);
+        return `${conclusion.label} · ${conclusion.detail}`;
+      }],
+      ['买家实际报价 / 配置', (branch) => branchBuyerRows(scenario, branch).map((row) => `${row.buyer} ${row.amount} · ${row.priceConfig || '配置待补'}`).join('；')],
+      ['买家级核验', (branch) => branchBuyerRows(scenario, branch).map((row) => `${row.buyer}：${row.diagnosis || '待核'}`).join('；')],
       ['成交买家 / 报告归属', (branch) => `${summaryValue(branch, ['成交买家', '成交'], '未找到')} / ${summaryValue(branch, ['报告归属', '成交报告'], '待确认')}`],
       ['售后', (branch) => branch.downstream.afterSale ? branch.downstream.afterSale.status : branch.downstream.pendingDeal ? '待成交后关联' : '未找到']
     ];
@@ -768,9 +821,9 @@
     const head = branches.map((branch) => `<th><div class="compare-head"><strong>${esc(branch.label)}</strong><span>${esc(branch.instanceId)}</span><button class="panel-link" type="button" data-branch-jump="${esc(branch.id)}">查看分支${ic('chevronRight')}</button></div></th>`).join('');
     const body = rows.map(([label, value]) => `<tr><th scope="row">${esc(label)}</th>${branches.map((branch) => `<td>${esc(value(branch))}</td>`).join('')}</tr>`).join('');
     return `<section class="branch-share-card"><div>${ic('database')}<span><strong>${esc(shareTitle)}</strong><p>${esc(shareNote)}</p></span></div><span class="status-pill info no-dot">${relation ? '并行保留 · 不覆盖' : '独立证据'}</span></section>
-      <div class="section-title-row"><div><h2>${esc(branches.map((branch) => branch.label).join(' / '))} 分支对比</h2><p>对比买家策略归属、独立模型任务、标签选择、报告和分支报价；金额不合并、不平均，也不跨成色档比较高低。</p></div><span class="section-meta">${branches.length} 个报告实例</span></div>
+      <div class="section-title-row"><div><h2>${esc(branches.map((branch) => branch.label).join(' / '))} 分支对比</h2><p>对比买家策略归属、独立模型任务、标签选择、报告和各买家报价；金额不合并、不平均，也不跨买家、报告或成色档比较高低。</p></div><span class="section-meta">${branches.length} 个报告实例</span></div>
       <div class="table-wrap branch-compare-table"><table class="data-table"><thead><tr><th>比较维度</th>${head}</tr></thead><tbody>${body}</tbody></table></div>
-      <div class="branch-compare-notes"><div>${ic('info')}<span><strong>为什么必须分分支：</strong>每个买家先使用独立策略归属报告；各报告又可以拥有不同模型任务、输入、候选标签和阈值。把证据合成一张，会混淆模型输出差异、策略选择差异和单分支规则差异。</span></div><div>${ic('alertCircle')}<span><strong>成交归属规则：</strong>成交买家同步后，系统按“成交买家 → 其独立策略 → 对应报告实例”自动确定归属，再关联该报告下的报价尝试和售后。</span></div></div>`;
+      <div class="branch-compare-notes"><div>${ic('info')}<span><strong>为什么必须分两层：</strong>不同买家先用独立策略归属报告；同一报告内，各买家又按自己的价格配置与扣减金额报价。分报告再分买家，才能区分模型/策略差异与买家价格配置差异。</span></div><div>${ic('alertCircle')}<span><strong>成交归属规则：</strong>成交买家同步后，系统按“成交买家 → 其独立策略 → 对应报告实例”自动确定归属，再关联该报告下该买家的报价尝试和售后。</span></div></div>`;
   }
 
   function renderConfig(config) {
@@ -780,17 +833,23 @@
   function renderQuote(scenario, branch) {
     const quote = branch.quote;
     const multiReport = branchesOf(scenario).length > 1;
-    const buyers = branch.audience && branch.audience.buyers ? branch.audience.buyers.join(' / ') : branch.buyer;
+    const audience = branchAudience(scenario, branch);
+    const buyerRows = branchBuyerRows(scenario, branch);
+    const buyers = audience.buyers.join(' / ') || branch.buyer;
+    const currentBuyer = String(quote.buyer || branch.buyer || '').replace(/^合作买家\s*/, '');
+    const currentBuyerRow = buyerRows.find((row) => row.buyer === currentBuyer) || buyerRows.find((row) => row.status === 'quoted');
+    const quotedRows = buyerRows.filter((row) => row.status === 'quoted');
     const model = branchModel(scenario, branch);
     const amount = quote.amountRaw == null ? '—' : quote.amount;
-    const priceNote = quote.amountRaw == null ? '本分支未生成报价' : `${branch.label} · 分支唯一报价`;
+    const priceNote = quote.amountRaw == null ? '本报告未生成有效报价' : `${branch.label} · ${currentBuyer || '当前买家'}实际报价`;
     const rules = quote.rules.map((rule) => `<tr class="${rule.tone === 'danger' ? 'missed' : rule.hit && rule.tone === 'success' ? 'hit' : ''}"><td><span class="priority">${rule.priority}</span></td><td><span class="rule-id">${esc(rule.id)}</span><span class="rule-name">${esc(rule.name)}</span></td><td>${esc(rule.condition)}</td><td>${esc(rule.action)}</td><td><span class="status-pill ${esc(rule.tone)} no-dot">${esc(rule.result)}</span></td></tr>`).join('');
-    const calc = quote.lines.length ? `${quote.lines.map((line) => `<div class="calc-line ${esc(line.kind)}"><span class="calc-label">${esc(line.label)}</span><span class="calc-amount">${line.amount < 0 ? '−' : ''}¥${Math.abs(line.amount).toLocaleString('zh-CN')}</span><span class="calc-source">${esc(line.source)}</span></div>`).join('')}<div class="calc-total"><span>本分支实际报价</span><div><strong>¥${esc(quote.total)}</strong><small>${esc(quote.totalNote)}</small></div></div>` : `<div class="empty-price">${ic('circleX')}<strong>未生成报价</strong><span>报价在扣减项匹配阶段终止，系统不生成推测金额或第二个价格。</span></div>`;
+    const calc = quote.lines.length ? `${quote.lines.map((line) => `<div class="calc-line ${esc(line.kind)}"><span class="calc-label">${esc(line.label)}</span><span class="calc-amount">${line.amount < 0 ? '−' : ''}¥${Math.abs(line.amount).toLocaleString('zh-CN')}</span><span class="calc-source">${esc(line.source)}</span></div>`).join('')}<div class="calc-total"><span>当前买家实际报价</span><div><strong>¥${esc(quote.total)}</strong><small>${esc(quote.totalNote)}</small></div></div>` : `<div class="empty-price">${ic('circleX')}<strong>未生成报价</strong><span>报价在扣减项匹配阶段终止，系统不生成推测金额或第二个价格。</span></div>`;
     const difference = quote.difference;
-    return `<div class="branch-quote-banner"><div><span class="branch-kicker">${ic('gitBranch')}当前报告分支</span><strong>${esc(branch.label)} · ${esc(branch.instanceId)}</strong><span>${esc(buyers)} → ${esc(branch.strategy.id)} · ${esc(branch.strategy.name)} ${esc(branch.strategy.version)} · ${esc(model.run || '任务待补')}</span></div>${multiReport ? `<span class="branch-banner-note">仅展示当前分支报价，其他报告请切换分支或查看分支对比</span>` : ''}</div>
+    return `<div class="branch-quote-banner"><div><span class="branch-kicker">${ic('gitBranch')}当前报告分支</span><strong>${esc(branch.label)} · ${esc(branch.instanceId)}</strong><span>${esc(buyers)} → ${esc(branch.strategy.id)} · ${esc(branch.strategy.name)} ${esc(branch.strategy.version)} · ${esc(model.run || '任务待补')}</span></div>${multiReport ? `<span class="branch-banner-note">当前报告内按买家独立报价；其他报告请切换分支查看</span>` : ''}</div>
+      <section class="quote-buyer-section"><div class="section-title-row"><div><h2>同一报告 · 各买家独立报价</h2><p>报告条件共享，价格配置与扣减金额按买家分别快照；金额差异不生成高低结论。</p></div><span class="section-meta">${quotedRows.length}/${buyerRows.length} 已报</span></div>${renderBuyerQuoteMatrix(buyerRows, audience)}</section>
       <section class="single-price-card">
-        <div><div class="single-price-label">${ic('receipt')}<span>${esc(priceNote)}</span></div><div class="single-price-value"><strong>${esc(amount)}</strong><span>${quote.amountRaw == null ? '未形成报价结果' : '买家实际报价 · 本次唯一报价对象'}</span></div><div class="single-price-sub">本页不展示应得报价、成本价、市场价、可比基准价或规则重算价，也不与其他报告分支的金额合并比较。</div></div>
-        <div class="single-price-meta"><div><span>报价尝试</span><strong>${esc(quote.attempt)}</strong></div><div><span>买家策略归属</span><strong>${esc(buyers)} → ${esc(branch.strategy.id)}</strong></div><div><span>报告实例</span><strong>${esc(branch.instanceId)}</strong></div><div><span>规则链结论</span><span class="status-pill ${esc(quote.statusTone)} no-dot">${esc(quote.statusLabel)}</span></div></div>
+        <div><div class="single-price-label">${ic('receipt')}<span>${esc(priceNote)}</span></div><div class="single-price-value"><strong>${esc(amount)}</strong><span>${quote.amountRaw == null ? '未形成报价结果' : '当前报价尝试 · 买家实际报价'}</span></div><div class="single-price-sub">这里展开一位买家的报价凭证；同一报告其他买家的价格配置、扣减金额和实际报价独立保留，不合并、不对比高低。</div></div>
+        <div class="single-price-meta"><div><span>报价尝试</span><strong>${esc(quote.attempt)}</strong></div><div><span>当前买家</span><strong>${esc(currentBuyer || '待补')}</strong></div><div><span>买家价格配置</span><strong>${esc(currentBuyerRow ? currentBuyerRow.priceConfig : '配置快照待补')}</strong></div><div><span>报告实例</span><strong>${esc(branch.instanceId)}</strong></div><div><span>规则链结论</span><span class="status-pill ${esc(quote.statusTone)} no-dot">${esc(quote.statusLabel)}</span></div></div>
       </section>
       <div class="quote-grid">
         <section class="panel">
@@ -806,7 +865,7 @@
         <div class="difference-head">${ic(difference.good ? 'circleCheck' : 'alertCircle')}<div><strong>${esc(difference.title)}</strong><p>${esc(difference.description)}</p></div></div>
         <ul class="difference-list">${difference.items.map(([label, value]) => `<li><span>${esc(label)}</span><b>${esc(value)}</b></li>`).join('')}</ul>
       </section>
-      <div class="quote-notes">${ic('info')}<span><strong>分支价格口径：</strong>每份报告、每个买家只保留一个实际报价。“成色 + 特定扣减项”命中后按其他成色价出价是合法能力；系统只还原当前报告分支的条件、规则优先级、实际价档和扣减/加价过程，不跨报告或跨成色档判断高低。</span></div>
+      <div class="quote-notes">${ic('info')}<span><strong>价格口径：</strong>每份报告、每个买家只保留一个实际报价。“成色 + 特定扣减项”命中后按其他成色价出价是合法能力；系统只逐买家还原报告条件、价格配置版本、规则优先级、实际价档和扣减/加价过程，不跨买家、跨报告或跨成色档判断高低。</span></div>
       <section class="panel quote-config-panel"><header class="panel-head"><div><h3>${esc(branch.label)}配置版本对照</h3><p>本分支固定使用报价时版本；当前版本仅用于变更排查</p></div><span class="status-pill info no-dot">版本快照</span></header><div class="panel-body">${renderConfig(branch.config)}</div></section>`;
   }
 
@@ -924,7 +983,7 @@
   }
 
   function openHelpModal() {
-    openModal(`<div class="modal-head"><div><h2 id="modalTitle">P0 追溯口径</h2><p>先锁定报告实例，再解释当前报告内的规则、买家报价与证据；系统不评价跨报告的绝对高低</p></div><button class="modal-close" type="button" data-close-modal aria-label="关闭">${ic('x')}</button></div><div class="modal-body"><div class="p1-banner">${ic('info')}<div><strong>一行一份报告，同单多报告并行保留</strong><p>报告台账按报告实例展示，不按订单合并。每个买家独立配置策略，策略在报告生成前决定哪些买家使用该报告；同一策略可绑定多个买家，但每位买家的已报价/未报价结果分别保留。</p></div></div><div class="scope-compare"><article><h3>支持</h3><p>当前报告已经形成的实际报价，能够由报告条件、命中规则、实际取用价档和计价明细完整解释。成色与专项扣减项命中后跨档取价属于合法业务。报告行同时展示该策略买家组内是否有未报价买家。</p></article><article><h3>不支持</h3><p>当前报告的实际报价与规则条件、优先级、实际价档或计价明细不一致。其他报告分支报价正常，不能抵消这个差异。</p></article><article><h3>未报价 / 待补证</h3><p>报告没有任何有效报价时标为“未报价”；缺少关键快照、无法判断规则链时标为“待补证”。买家级未报价在详情买家矩阵展开，不等同于整份报告未报价。</p></article></div><div class="quote-notes">${ic('alertCircle')}<span><strong>价格边界：</strong>只展示买家实际报价，不使用其他报告分支金额、其他买家报价、历史成交、市场价、成本价、规则重算价或不同成色档的绝对价格作为自动高低基准。</span></div></div>`);
+    openModal(`<div class="modal-head"><div><h2 id="modalTitle">P0 追溯口径 · 报告 × 买家</h2><p>先锁定报告实例，再逐买家解释价格配置、扣减金额和实际报价；不跨买家或跨报告评价高低</p></div><button class="modal-close" type="button" data-close-modal aria-label="关闭">${ic('x')}</button></div><div class="modal-body"><div class="p1-banner">${ic('info')}<div><strong>报告共享条件，买家各自核价</strong><p>报告台账按报告实例展示，不按订单合并。同一订单的多份报告并行保留；同一份报告也可绑定多位买家。每位买家使用自己的价格配置版本、成色价档和扣减金额，实际报价分别生成、分别核验。</p></div></div><div class="scope-compare"><article><h3>支持</h3><p>当前报告所有已形成报价，均能由各自买家的报告条件、价格配置快照、命中规则、实际价档和计价明细完整解释。买家金额不同本身不构成异常。</p></article><article><h3>不支持</h3><p>至少一位已报价买家的规则条件、优先级、实际价档或计价明细与报价不一致。其他买家或报告报价正常，不能抵消该差异。</p></article><article><h3>未报价 / 待补证</h3><p>报告没有任何有效报价时标为“未报价”；缺少关键快照时标为“待补证”。个别买家未报价仍在矩阵中单独展开，不直接改判整份报告。</p></article></div><div class="quote-notes">${ic('alertCircle')}<span><strong>价格边界：</strong>只展示每位买家的实际报价，不使用同报告其他买家、其他报告分支、历史成交、市场价、成本价、规则重算价或不同成色档的绝对价格作为高低基准。</span></div></div>`);
   }
 
   function openModal(contentHtml) {
@@ -1001,15 +1060,16 @@
       showToast('当前筛选下没有可导出的报告', 'error');
       return;
     }
-    const header = ['订单号', '设备', '门店', '渠道', '报告实例', '报告 ID / 版本', '买家策略', '策略买家组', '模型任务', 'run_id', '报告成色 / 问题项', '已报价买家 / 实际报价', '未报价买家 / 原因', '成交与售后', '链路结论', '证据完整度'];
+    const header = ['订单号', '设备', '门店', '渠道', '报告实例', '报告 ID / 版本', '买家策略', '策略买家组', '模型任务', 'run_id', '报告成色 / 问题项', '已报价买家 / 实际报价 / 价格配置 / 扣减快照', '未报价买家 / 原因', '买家级结论', '成交与售后', '链路结论', '证据完整度'];
     const lines = rows.map(({ scenario, branch, conclusion }) => {
       const model = branchModel(scenario, branch);
       const strategy = branchStrategy(scenario, branch);
       const audience = branchAudience(scenario, branch);
       const buyerRows = branchBuyerRows(scenario, branch);
       const downstream = branchDownstream(scenario, branch);
-      const quoted = buyerRows.filter((row) => row.status === 'quoted').map((row) => `${row.buyer} ${row.amount}（${row.rule}）`).join(' / ');
+      const quoted = buyerRows.filter((row) => row.status === 'quoted').map((row) => `${row.buyer} ${row.amount}（${row.priceConfig || '配置待补'}；${row.deductions || '扣减待补'}）`).join(' / ');
       const unquoted = buyerRows.filter((row) => row.status === 'unquoted').map((row) => `${row.buyer}（${row.reason}）`).join(' / ');
+      const buyerDiagnosis = buyerRows.map((row) => `${row.buyer}：${row.diagnosis || '待核'}（${row.reason || '说明待补'}）`).join(' / ');
       const afterSale = downstream.afterSale;
       return [
         scenario.orderNo,
@@ -1025,6 +1085,7 @@
         `${branch.reportGrade}：${(branch.issues || []).join('、')}`,
         quoted || '—',
         unquoted || '—',
+        buyerDiagnosis || '—',
         afterSale ? `${afterSale.id} · ${afterSale.status}` : '无售后/待关联',
         `${conclusion.label} · ${conclusion.detail}`,
         `${branch.completenessText} ${branch.completenessPct}%`
@@ -1064,7 +1125,8 @@
         report: { grade: branch.reportGrade, issues: branch.issues },
         selected_labels: branch.selectedLabels || [],
         mappings: branch.mappings,
-        quote: { actual_amount: branch.amountValue, amount_display: branch.amount, status: branch.quote.statusLabel, rules: branch.quote.rules, calculation: branch.quote.lines, difference: branch.quote.difference },
+        buyer_quotes: branchBuyerRows(scenario, branch),
+        quote: { primary_buyer: branch.quote.buyer || null, actual_amount: branch.quote.amountRaw, amount_display: branch.quote.amount, status: branch.quote.statusLabel, rules: branch.quote.rules, calculation: branch.quote.lines, difference: branch.quote.difference },
         downstream: branch.downstream,
         config_versions: branch.config,
         stages: branch.stages || {}
@@ -1085,7 +1147,9 @@
     const strategy = branchStrategy(scenario, branch);
     const audience = branchAudience(scenario, branch);
     const buyerRows = branchBuyerRows(scenario, branch);
-    const buyerText = buyerRows.map((row) => `${row.buyer}：${row.status === 'quoted' ? row.amount : `未报价（${row.reason}）`}`).join('；');
+    const buyerText = buyerRows.map((row) => row.status === 'quoted'
+      ? `${row.buyer}：${row.amount}（${row.priceConfig || '配置待补'}；${row.deductions || '扣减待补'}；${row.diagnosis || '待核'}）`
+      : `${row.buyer}：未报价（${row.reason}）`).join('；');
     const conclusion = branchConclusion(scenario, branch);
     const text = `【${scenario.orderNo}】${scenario.device} ${scenario.specs}\ntrace_id：${scenario.traceId}\n报告实例：${branch.label} · ${branch.instanceId} · ${branchReportVersion(scenario, branch)}\n买家策略归属：${audience.buyers.join('、')} → ${strategy.id} · ${strategy.name} ${strategy.version}\nAI 任务：${model.run || '待补'} · ${model.code || '—'} · ${model.input || '输入待补'}\nAI 报告：${branch.reportGrade} / ${branch.issues.join('、')}\n报价买家：${buyerText || '待补'}\n结论：${conclusion.label} · ${conclusion.detail}\n${branch.verdict.title}`;
     copyText(text);

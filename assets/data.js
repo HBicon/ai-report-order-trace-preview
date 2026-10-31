@@ -674,10 +674,11 @@
     reportCount: 2,
     reportGrade: '2 份',
     issues: [],
-    amount: '¥4,120 / ¥3,780',
+    amount: '¥4,120 / ¥4,060 / ¥3,780',
     amountValue: 4120,
     amountLines: [
-      { label: 'A', value: '¥4,120' },
+      { label: 'A · B-301', value: '¥4,120' },
+      { label: 'A · B-302', value: '¥4,060' },
       { label: 'B', value: '¥3,780' }
     ],
     buyer: 'B-301 / B-302 / B-305 / B-306',
@@ -712,22 +713,22 @@
         instanceId: 'RI-1042-A',
         reportId: 'RPT-1042-A',
         reportVersion: 'V1',
-        audience: { label: '策略 A 买家组', buyers: ['B-301', 'B-302'], note: '同一策略绑定 2 个买家；买家级报价结果独立保留' },
+        audience: { label: '策略 A 买家组', buyers: ['B-301', 'B-302'], note: '同一报告绑定 2 个买家；买家价格与扣减配置分别快照' },
         strategy: { id: 'S-COLOR-03', name: '成色优先策略', version: 'v3.2', selected: '后摄进灰 + 边框磕碰' },
         staffReport: '店员上报：边框轻微使用痕迹，后摄未见异常，屏幕显示正常',
         buyerQuotes: [
-          { buyer: 'B-301', status: 'quoted', amount: '¥4,120', rule: 'PR-0701 · 优先级 30', priceTier: '大花价 4,300', reason: '实际报价可完整复算' },
-          { buyer: 'B-302', status: 'unquoted', amount: '—', rule: 'PR-0701 已命中', priceTier: '大花价已选，扣减未执行', reason: '未维护后摄像头进灰扣减项 D-036' }
+          { buyer: 'B-301', status: 'quoted', amount: '¥4,120', strategy: 'S-COLOR-03 v3.2', priceConfig: 'PRICE-B301-V4.1', rule: 'PR-0701 · 优先级 30', priceTier: '大花价 4,300', deductions: '后摄进灰 −120 · 边框磕碰 −60', deductionIds: 'D-036 · D-018', diagnosis: '规则执行一致', diagnosisTone: 'success', reason: '按 B-301 价格配置完整复算，实际报价可解释' },
+          { buyer: 'B-302', status: 'quoted', amount: '¥4,060', strategy: 'S-COLOR-03 v3.2', priceConfig: 'PRICE-B302-V2.6', rule: 'PR-0701 · 优先级 30', priceTier: '大花价 4,260', deductions: '后摄进灰 −160 · 边框磕碰 −40', deductionIds: 'D-052 · D-029', diagnosis: '规则执行一致', diagnosisTone: 'success', reason: '同一报告、不同买家配置；金额差异不构成高低异常' }
         ],
         reportGrade: '大花',
         issues: ['后摄像头进灰', '边框磕碰'],
         amountValue: 4120,
-        amount: '¥4,120',
+        amount: '¥4,120 / ¥4,060',
         buyer: '合作买家 B-301 / B-302',
         completenessText: '证据完整',
         completenessPct: 96,
         completenessTone: 'warning',
-        badge: '分支 A 规则执行一致',
+        badge: '2 个买家报价均可解释',
         badgeTone: 'success',
         selectedLabels: ['后摄像头进灰', '边框磕碰'],
         model: {
@@ -749,13 +750,13 @@
         verdict: {
           tone: 'success',
           icon: 'circleCheck',
-          label: '分支 A · 规则执行一致',
-          title: '报告 A 的报价可由本分支规则链完整解释',
-          description: '买家 B-301 的独立策略 S-COLOR-03 选取报告 A 候选标签“后摄进灰 + 边框磕碰”，报告 A 为大花。B-301 按大花价 4,300 扣减 120 和 60，实际报价 4,120。该金额只属于报告分支 A，不能与报告 B 合并、平均或跨报告比较。'
+          label: '分支 A · 2/2 买家可解释',
+          title: '同一份报告，两位买家按各自价格与扣减配置形成不同报价',
+          description: '报告 A 统一给出“大花 + 后摄进灰 + 边框磕碰”。B-301 使用价格配置 PRICE-B301-V4.1，按大花价 4,300 扣减 120、60，报价 4,120；B-302 使用 PRICE-B302-V2.6，按大花价 4,260 扣减 160、40，报价 4,060。两份报价均能由各自报价时快照完整解释，金额不同不代表报告异常，也不做买家间高低比较。'
         },
         facts: [
           { label: '买家策略归属', value: 'B-301 / B-302 → A', note: 'S-COLOR-03 · v3.2 · 报告生成前绑定' },
-          { label: '分支实际报价', value: '¥4,120', note: 'B-301 · 唯一报价对象' },
+          { label: '买家实际报价', value: '2/2 已报', note: 'B-301 ¥4,120 · B-302 ¥4,060' },
           { label: '独立模型任务', value: '3 图 · 2 通过', note: 'RUN-1042-A7 · 阈值 0.65' },
           { label: '成交后报告归属', value: '待成交买家', note: 'B-301 成交则自动关联 RI-1042-A' }
         ],
@@ -772,14 +773,14 @@
           mapping: stage('报告 A · 策略选择与标签映射', 'gitBranch', 'ok', '10:26:17', '买家策略 S-COLOR-03 从报告 A 的候选标签中选择 2 个，并映射为大花报告项。', [
             ['买家策略', 'S-COLOR-03 · v3.2'], ['选用标签', '后摄进灰 · 边框磕碰'], ['映射版本', 'MAP-V12.4'], ['未选标签', '屏幕轻微划痕 · 低于阈值']
           ], [['策略配置', 'STR-SCOLOR-03-V3.2 · 已冻结', 'gitBranch'], ['映射决策', 'MAP-1042-A · 2 行', 'fileText']], '策略差异在这里发生；只能从报告 A 自己的模型输出中选择标签。'),
-          report: stage('AI 报告 A', 'fileText', 'ok', '10:26:20', '报告实例 RI-1042-A 生成：大花，2 个扣减项，引用报告 A 的原始标签。', [
-            ['报告实例', 'RI-1042-A'], ['报告成色', '大花'], ['问题项', '后摄进灰 · 边框磕碰'], ['扣减合计', '-180']
-          ], [['报告快照', 'RPT-1042-A · 已冻结', 'fileText'], ['标签引用', 'LAB-1042-A-001 / 002', 'tag']], '每份报告在分支内唯一；订单可以同时保留多个报告实例，后生成报告不覆盖前一份。'),
-          quote: stage('分支 A 报价决策', 'receipt', 'ok', '10:26:23', '买家 B-301 按大花价 4,300，扣减后摄进灰 120、边框磕碰 60，实际报价 4,120；同一买家组内 B-302 因未维护后摄扣减项未出价。', [
-            ['命中规则', 'PR-0701 · 优先级 30'], ['取用价档', '大花价 4,300'], ['买家结果', 'B-301 已报 · B-302 未报'], ['实际报价', 'B-301 · 4,120']
-          ], [['规则命中快照', 'QUOTE-1042-A · PR-0701', 'gitBranch'], ['计价明细', 'LINE-1042-A · 3 行', 'receipt']], '报告 A 与买家 B-301 形成实际报价，B-302 的阻断原因单独保留；该价格不外推为整单唯一价格。'),
-          downstream: stage('分支 A 成交与售后', 'packageCheck', 'warn', '—', '分支 A 已有 B-301 的有效报价，B-302 未出价；成交买家尚未同步，报告归属由成交买家反查其独立策略后自动确定。', [
-            ['分支结果', 'B-301 已报 · B-302 未报'], ['成交买家', '待同步'], ['报告归属', '成交买家策略自动关联 RI-1042-A'], ['售后', '待成交后关联']
+          report: stage('AI 报告 A', 'fileText', 'ok', '10:26:20', '报告实例 RI-1042-A 生成：大花，2 个报告扣减项，引用报告 A 的原始标签；具体扣减金额由各买家价格配置维护。', [
+            ['报告实例', 'RI-1042-A'], ['报告成色', '大花'], ['问题项', '后摄进灰 · 边框磕碰'], ['扣减项数量', '2 项 · 买家分别定价']
+          ], [['报告快照', 'RPT-1042-A · 已冻结', 'fileText'], ['标签引用', 'LAB-1042-A-001 / 002', 'tag']], '报告只固定条件与问题项，不固定唯一扣减金额；同一报告内不同买家可以使用各自维护的金额。'),
+          quote: stage('分支 A · 买家独立报价', 'receipt', 'ok', '10:26:23', '报告 A 同时形成两笔买家报价：B-301 按 PRICE-B301-V4.1 取大花价 4,300、扣减 180，报价 4,120；B-302 按 PRICE-B302-V2.6 取大花价 4,260、扣减 200，报价 4,060。', [
+            ['命中规则', '两位买家均命中 PR-0701'], ['B-301 实际报价', '4,120 · PRICE-B301-V4.1'], ['B-302 实际报价', '4,060 · PRICE-B302-V2.6'], ['报价结论', '2/2 买家的规则链均可解释']
+          ], [['买家报价快照', 'QUOTE-1042-A · 2 笔', 'receipt'], ['买家配置与计价明细', 'B-301 / B-302 分别冻结', 'gitBranch']], '报告相同不代表买家报价相同；价格与扣减金额随买家配置独立保存，不使用一位买家的报价评价另一位买家。'),
+          downstream: stage('分支 A 成交与售后', 'packageCheck', 'warn', '—', '分支 A 的两位买家均已报价；成交买家尚未同步，报告归属由成交买家反查其独立策略后自动确定。', [
+            ['分支结果', '2/2 买家已报'], ['成交买家', '待同步'], ['报告归属', '成交买家策略自动关联 RI-1042-A'], ['售后', '待成交后关联']
           ], [['报价记录', 'QUOTE-1042-A · 已生成', 'receipt']], '不存在“选择报告 A/B 成交”的步骤；成交买家 B-301 确定后，按 B-301 → S-COLOR-03 → RI-1042-A 自动归属。')
         },
         events: [
@@ -789,17 +790,17 @@
           ['10:26:13', '报告 A 候选标签完成', '2 个通过 / 2 个低于阈值', 'ok'],
           ['10:26:17', '策略 A 选择标签', '后摄进灰 + 边框磕碰', 'ok'],
           ['10:26:20', '生成报告 A', 'RI-1042-A · 大花', 'ok'],
-          ['10:26:23', '生成分支报价 A', 'B-301 报价 4,120；B-302 缺扣减配置未报价', 'warn']
+          ['10:26:23', '生成买家独立报价 A', 'B-301 报价 4,120；B-302 报价 4,060；按各自配置核验', 'ok']
         ],
         config: [
           { name: '运营策略', used: 'S-COLOR-03 · v3.2', current: 'S-COLOR-03 · v3.3', changed: true, note: '当前版本未参与本单' },
           { name: '标签映射', used: 'MAP-V12.4', current: 'MAP-V12.4', changed: false, note: '' },
-          { name: '价格规则', used: 'PRICE-B301-V4.1', current: 'PRICE-B301-V4.1', changed: false, note: '' },
+          { name: '买家价格配置', used: 'B-301 V4.1 · B-302 V2.6', current: '按买家独立维护', changed: false, note: '同一报告不共用扣减金额快照' },
           { name: '模型阈值', used: 'THR-CAM-0.65', current: 'THR-CAM-0.68', changed: true, note: '报告 A 独立阈值快照' }
         ],
         mappings: [
-          { source: '后摄像头进灰', type: '外观 / 摄像头', option: '外观 → 后摄进灰', severity: '中', report: '扣减项 · -120', filtered: false },
-          { source: '边框磕碰', type: '外观 / 边框', option: '边框 → 磕碰', severity: '轻', report: '扣减项 · -60', filtered: false },
+          { source: '后摄像头进灰', type: '外观 / 摄像头', option: '外观 → 后摄进灰', severity: '中', report: '报告扣减项 · 买家金额', filtered: false },
+          { source: '边框磕碰', type: '外观 / 边框', option: '边框 → 磕碰', severity: '轻', report: '报告扣减项 · 买家金额', filtered: false },
           { source: '屏幕轻微划痕', type: '外观 / 屏幕', option: '报告 A 阈值未通过', severity: '—', report: '未进入报告 A', filtered: true },
           { source: '主板维修', type: '功能 / 主板', option: '报告 A 阈值未通过', severity: '—', report: '未进入报告 A', filtered: true }
         ],
@@ -816,7 +817,7 @@
             { label: '后摄像头进灰', source: '扣减配置 D-036 · 分支 A 执行一次', amount: -120, kind: 'deduction' },
             { label: '边框磕碰', source: '扣减配置 D-018 · 分支 A 执行一次', amount: -60, kind: 'deduction' }
           ],
-          total: '4,120', totalNote: '报告 A · 买家 B-301 的实际报价',
+          total: '4,120', totalNote: '报告 A · 买家 B-301 的实际报价；B-302 报价见买家矩阵',
           difference: {
             good: true,
             title: '分支 A 的报告、规则与报价完整勾稽',
@@ -824,20 +825,21 @@
             items: [
               ['分支标识', 'RI-1042-A'],
               ['实际取用价档', '大花价 4,300'],
-              ['分支实际报价', '4,120 · B-301']
+              ['当前买家实际报价', '4,120 · B-301'],
+              ['同报告另一买家', '4,060 · B-302 · 配置独立']
             ]
           }
         },
         downstream: {
           pendingDeal: true,
           summary: [
-            { label: '分支买家', value: 'B-301 已报 / B-302 未报', note: 'S-COLOR-03 · v3.2' },
-            { label: '分支实际报价', value: '¥4,120', note: '仅 B-301 · 报告 A' },
+            { label: '分支买家', value: '2/2 已报', note: 'B-301 / B-302 · 配置分别核验' },
+            { label: '买家实际报价', value: '¥4,120 / ¥4,060', note: 'B-301 / B-302 · 不横向比价' },
             { label: '成交买家', value: '待同步', note: '由成交事件同步' },
             { label: '报告归属', value: '自动关联', note: 'B-301 成交 → RI-1042-A' }
           ],
           events: [
-            ['10:26', '分支 A 生成实际报价', 'B-301 · 4,120；B-302 未报', 'warn'],
+            ['10:26', '分支 A 生成买家报价', 'B-301 · 4,120；B-302 · 4,060', 'ok'],
             ['—', '成交买家待同步', '成交买家按策略自动归属 RI-1042-A', 'muted']
           ],
           afterSale: null,
@@ -850,12 +852,12 @@
         instanceId: 'RI-1042-B',
         reportId: 'RPT-1042-B',
         reportVersion: 'V1',
-        audience: { label: '策略 B 买家组', buyers: ['B-305', 'B-306'], note: '同一策略绑定 2 个买家；买家级报价结果独立保留' },
+        audience: { label: '策略 B 买家组', buyers: ['B-305', 'B-306'], note: '同一报告绑定 2 个买家；买家价格与扣减配置分别快照' },
         strategy: { id: 'S-SCREEN-02', name: '屏幕专项策略', version: 'v2.7', selected: '后摄进灰 + 屏幕划痕' },
         staffReport: '店员上报：屏幕显示正常，边框有使用痕迹，后摄未见异常',
         buyerQuotes: [
-          { buyer: 'B-305', status: 'quoted', amount: '¥3,780', rule: 'PR-0701 · 优先级 30', priceTier: '中花价 4,000', reason: '实际报价可解释；专项规则优先级存在差异' },
-          { buyer: 'B-306', status: 'unquoted', amount: '—', rule: 'PR-0701 已命中', priceTier: '中花价已选，扣减未执行', reason: '未维护屏幕轻微划痕扣减项 D-041' }
+          { buyer: 'B-305', status: 'quoted', amount: '¥3,780', strategy: 'S-SCREEN-02 v2.7', priceConfig: 'PRICE-B305-V6.3', rule: 'PR-0701 · 优先级 30', priceTier: '中花价 4,000', deductions: '后摄进灰 −120 · 屏幕划痕 −100', deductionIds: 'D-036 · D-041', diagnosis: '规则链差异', diagnosisTone: 'danger', reason: '专项规则 PR-0904 满足条件但优先级低于通用规则；仅影响 B-305' },
+          { buyer: 'B-306', status: 'unquoted', amount: '—', strategy: 'S-SCREEN-02 v2.7', priceConfig: 'PRICE-B306-V1.9', rule: 'PR-0701 已选', priceTier: '中花价已选', deductions: '后摄进灰 −100 · 屏幕划痕未配置', deductionIds: 'D-036 · D-041 缺失', diagnosis: '未报价', diagnosisTone: 'danger', reason: '未维护屏幕轻微划痕扣减项 D-041' }
         ],
         reportGrade: '中花',
         issues: ['后摄像头进灰', '屏幕轻微划痕'],
@@ -894,7 +896,7 @@
         },
         facts: [
           { label: '买家策略归属', value: 'B-305 / B-306 → B', note: 'S-SCREEN-02 · v2.7 · 报告生成前绑定' },
-          { label: '分支实际报价', value: '¥3,780', note: 'B-305 · 唯一报价对象' },
+          { label: '买家实际报价', value: '1/2 已报', note: 'B-305 ¥3,780 · B-306 未报价' },
           { label: '独立模型任务', value: '4 图 · 2 通过', note: 'RUN-1042-B4 · 阈值 0.65' },
           { label: '成交后报告归属', value: '待成交买家', note: 'B-305 成交则自动关联 RI-1042-B' }
         ],
@@ -911,12 +913,12 @@
           mapping: stage('报告 B · 策略选择与标签映射', 'gitBranch', 'ok', '10:26:18', '买家策略 S-SCREEN-02 从报告 B 的候选标签中选择 2 个，并生成中花报告项。', [
             ['买家策略', 'S-SCREEN-02 · v2.7'], ['选用标签', '后摄进灰 · 屏幕划痕'], ['映射版本', 'MAP-V12.6'], ['未选标签', '边框磕碰 · 低于阈值']
           ], [['策略配置', 'STR-SSCREEN-02-V2.7 · 已冻结', 'gitBranch'], ['映射决策', 'MAP-1042-B · 2 行', 'fileText']], '本分支模型输出与策略选择均可独立追查，避免把任务差异误判为策略配置问题。'),
-          report: stage('AI 报告 B', 'fileText', 'ok', '10:26:22', '报告实例 RI-1042-B 生成：中花，2 个扣减项，引用报告 B 的原始标签。', [
-            ['报告实例', 'RI-1042-B'], ['报告成色', '中花'], ['问题项', '后摄进灰 · 屏幕划痕'], ['扣减合计', '-220']
-          ], [['报告快照', 'RPT-1042-B · 已冻结', 'fileText'], ['标签引用', 'LAB-1042-B-001 / 002', 'tag']], '报告 B 是独立快照，与报告 A 并行保留，不覆盖报告 A，也不被报告 A 的结论覆盖。'),
-          quote: stage('分支 B 报价决策', 'receipt', 'error', '10:26:25', '买家 B-305 的专项 PR-0904 满足“中花 + 屏幕划痕”条件，但优先级 15 低于通用规则 30；最终取中花价 4,000，扣减 220，实际报价 3,780。B-306 因未维护屏幕扣减项未出价。', [
-            ['满足条件规则', 'PR-0904 与 PR-0701'], ['实际命中', 'PR-0701 · 优先级 30'], ['买家结果', 'B-305 已报 · B-306 未报'], ['实际报价', 'B-305 · 3,780']
-          ], [['规则命中快照', 'QUOTE-1042-B · PR-0701', 'gitBranch'], ['价档取用记录', '中花价 4,000', 'receipt']], '这是分支 B 内的真实规则链差异；B-306 的阻断原因单独保留，不能因为分支 A 报价正常就忽略。'),
+          report: stage('AI 报告 B', 'fileText', 'ok', '10:26:22', '报告实例 RI-1042-B 生成：中花，2 个报告扣减项，引用报告 B 的原始标签；扣减金额由 B-305、B-306 各自配置维护。', [
+            ['报告实例', 'RI-1042-B'], ['报告成色', '中花'], ['问题项', '后摄进灰 · 屏幕划痕'], ['扣减项数量', '2 项 · 买家分别定价']
+          ], [['报告快照', 'RPT-1042-B · 已冻结', 'fileText'], ['标签引用', 'LAB-1042-B-001 / 002', 'tag']], '报告 B 是独立快照，与报告 A 并行保留；同一报告内的买家金额也分别保存，不覆盖、不合并。'),
+          quote: stage('分支 B · 买家独立报价', 'receipt', 'error', '10:26:25', 'B-305 的专项 PR-0904 满足“中花 + 屏幕划痕”条件，但优先级 15 低于通用规则 30；最终取中花价 4,000，扣减 220，实际报价 3,780。B-306 按自己的 PRICE-B306-V1.9 配置缺少屏幕划痕扣减项 D-041，未出价。', [
+            ['B-305 规则判断', 'PR-0904 满足但被 PR-0701 抢先'], ['B-305 实际报价', '3,780 · PRICE-B305-V6.3'], ['B-306 状态', '未报价 · 缺少 D-041'], ['买家结果', '1/2 已报 · 1/2 未报']
+          ], [['买家报价快照', 'QUOTE-1042-B · 1 笔', 'gitBranch'], ['买家配置与阻断证据', 'B-305 / B-306 分别冻结', 'alert']], 'B-305 的规则链差异与 B-306 的买家配置缺口分开展示，不能把两者合并成一个原因。'),
           downstream: stage('分支 B 成交与售后', 'packageCheck', 'warn', '—', '分支 B 已有 B-305 的有效报价且规则链存在差异，B-306 未出价；成交买家尚未同步，报告归属由成交买家反查其独立策略后自动确定。', [
             ['分支结果', 'B-305 已报 · B-306 未报'], ['规则链', '差异待修正'], ['成交买家', '待同步'], ['报告归属', '成交买家策略自动关联 RI-1042-B']
           ], [['报价记录', 'QUOTE-1042-B · 已生成', 'receipt'], ['异常快照', 'RULE-DIFF-1042-B', 'alert']], '分支 B 的异常需独立处理；成交买家确定后按 B-305 → S-SCREEN-02 → RI-1042-B 自动归属，追溯系统不另行判断。')
@@ -933,12 +935,12 @@
         config: [
           { name: '运营策略', used: 'S-SCREEN-02 · v2.7', current: 'S-SCREEN-02 · v2.7', changed: false, note: '' },
           { name: '标签映射', used: 'MAP-V12.6', current: 'MAP-V12.6', changed: false, note: '' },
-          { name: '价格规则', used: 'PRICE-B305-V6.3', current: 'PRICE-B305-V6.4', changed: true, note: '当前版本未参与本单' },
+          { name: '买家价格配置', used: 'B-305 V6.3 · B-306 V1.9', current: '按买家独立维护', changed: true, note: 'B-305 当前配置已更新；历史按报价时快照' },
           { name: '模型阈值', used: 'THR-CAM-0.65', current: 'THR-CAM-0.68', changed: true, note: '报告 B 独立阈值快照' }
         ],
         mappings: [
-          { source: '后摄像头进灰', type: '外观 / 摄像头', option: '外观 → 后摄进灰', severity: '中', report: '扣减项 · -120', filtered: false },
-          { source: '屏幕轻微划痕', type: '外观 / 屏幕', option: '屏幕 → 轻微划痕', severity: '中', report: '扣减项 · -100', filtered: false },
+          { source: '后摄像头进灰', type: '外观 / 摄像头', option: '外观 → 后摄进灰', severity: '中', report: '报告扣减项 · 买家金额', filtered: false },
+          { source: '屏幕轻微划痕', type: '外观 / 屏幕', option: '屏幕 → 轻微划痕', severity: '中', report: '报告扣减项 · 买家金额', filtered: false },
           { source: '边框磕碰', type: '外观 / 边框', option: '报告 B 阈值未通过', severity: '—', report: '未进入报告 B', filtered: true },
           { source: '主板维修', type: '功能 / 主板', option: '报告 B 阈值未通过', severity: '—', report: '未进入报告 B', filtered: true }
         ],
@@ -964,7 +966,8 @@
             items: [
               ['首个差异', '专项规则优先级低于通用规则'],
               ['实际取用价档', '中花价 4,000'],
-              ['分支实际报价', '3,780 · B-305']
+              ['当前买家实际报价', '3,780 · B-305'],
+              ['同报告另一买家', 'B-306 · 未报价']
             ]
           }
         },
@@ -972,7 +975,7 @@
           pendingDeal: true,
           summary: [
             { label: '分支买家', value: 'B-305 已报 / B-306 未报', note: 'S-SCREEN-02 · v2.7' },
-            { label: '分支实际报价', value: '¥3,780', note: '仅 B-305 · 报告 B' },
+            { label: '买家实际报价', value: '1/2 已报', note: 'B-305 ¥3,780 · B-306 未报价' },
             { label: '成交买家', value: '待同步', note: '由成交事件同步' },
             { label: '报告归属', value: '自动关联', note: 'B-305 成交 → RI-1042-B' }
           ],
