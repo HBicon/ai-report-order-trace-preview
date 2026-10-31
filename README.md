@@ -10,6 +10,8 @@ REQ-20261021-001 · Gate 2 产品评审站 · v1.3。
 - 方案说明：`proposal/`
 - 可交互原型：`prototype/`
 - 评审记录：`review-record/`
+- 公网评审站：https://hbicon.github.io/ai-report-order-trace-preview/
+- 公网原型：https://hbicon.github.io/ai-report-order-trace-preview/prototype/
 
 ## 当前阶段
 
